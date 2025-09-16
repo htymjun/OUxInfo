@@ -5,7 +5,7 @@ PYTHON_VERSION = 3.10
 PYTHON_INC     = $(shell python$(PYTHON_VERSION)-config --includes)
 PYBIND11_INC   = $(shell python3 -m pybind11 --includes)
 # FLAGS
-FFLAGS  = -Ofast -g -Wall -march=native
+FFLAGS  = -Ofast -g -Wall -fcheck=all -fbacktrace -march=native
 CFLAGS  = --compile -fPIC -O3 -std=c++17 $(PYTHON_INC) $(PYBIND11_INC)
 LDFLAGS = -shared -fPIC
 
