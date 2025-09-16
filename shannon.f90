@@ -11,15 +11,15 @@ contains
     real(4), parameter  :: pi = acos(-1.e0)
     type(kdtree2), pointer :: tree
     type(kdtree2_result), allocatable :: distance(:)
-    real(4) :: H, Cdx, Elog_eps = 0.e0, eps(N)
+    real(4) :: H, eps, Cdx, Elog_eps = 0.e0
     integer i
     tree => kdtree2_create(x, dx)
     allocate(distance(k))
     do i = 1, N
       call kdtree2_n_nearest(tree, x(:,i), k, distance)
       call kdtree2_sort_results(k, distance)
-      eps(i) = 2.e0 * distance(k)%dis
-      Elog_eps = Elog_eps + log(eps(i))
+      eps = 2.e0 * distance(k)%dis
+      Elog_eps = Elog_eps + log(eps)
     enddo
     deallocate(distance)
     call kdtree2_destroy(tree)
