@@ -14,11 +14,11 @@ contains
     real(4) :: H, eps, Cdx, Elog_eps = 0.e0
     integer i
     tree => kdtree2_create(x, dx)
-    allocate(distance(k))
+    allocate(distance(k+1))
     do i = 1, N
-      call kdtree2_n_nearest(tree, x(:,i), k, distance)
-      call kdtree2_sort_results(k, distance)
-      eps = 2.e0 * distance(k)%dis
+      call kdtree2_n_nearest(tree, x(:,i), k+1, distance)
+      call kdtree2_sort_results(k+1, distance)
+      eps = 2.e0 * distance(k+1)%dis
       Elog_eps = Elog_eps + log(eps)
     enddo
     deallocate(distance)

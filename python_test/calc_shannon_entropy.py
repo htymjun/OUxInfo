@@ -62,6 +62,6 @@ def test_k():
   plt.show()
 
 
-test_sigma()
-test_k()
+#test_sigma()
+#test_k()
 
