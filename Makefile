@@ -16,7 +16,7 @@ LDFLAGS = -shared -fPIC
 
 %.mod: %.f90 %.o
 		@:
-vpath %f90 ./special:./KDTree
+vpath %f90 ./special:./kdtree2
 
 FSRC = special.o \
       kdtree2.o \
