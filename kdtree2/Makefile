@@ -16,19 +16,17 @@ LDFLAGS = -shared -fPIC
 
 %.mod: %.f90 %.o
 		@:
-vpath %f90 ./special:./kdtree2
 
-FSRC = special.o \
-      kdtree2.o \
-      shannon.o \
-      shannon_cbind.o
+FSRC = kdtree2.o \
+      test_kdtree2.o \
+      test_kdtree2_cbind.o
 CSRC = wrapper.cpp
 
 FOBJ = $(FSRC:.f90=.o)
 COBJ = $(CSRC:.cpp=.o)
 OBJ  = $(FOBJ) $(COBJ)
 
-TARGET = shannon.so
+TARGET = kdtree2.so
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
@@ -41,10 +39,10 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # dependencies
-shannon.o: kdtree2.mod special.mod
-shannon_cbind.o: shannon.mod
+test_kdtree2.o: kdtree2.mod
+test_kdtree2_cbind.o: test_kdtree2.mod
 wrapper.o: $(FSRC:.f90=.o)
-cufd.so: wrapper.o
+kdtree.so: wrapper.o
 
 clean:
 		rm -f *.mod *.o *.out
