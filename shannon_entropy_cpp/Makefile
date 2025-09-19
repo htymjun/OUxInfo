@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3 -std=c++11 -fPIC $(shell python3 -m pybind11 --includes)
+CXXFLAGS = -Ofast -std=c++14 -fPIC $(shell python3 -m pybind11 --includes)
 LDFLAGS = -shared
 
 TARGET = shannon_entropy_cpp$(shell python3-config --extension-suffix)
