@@ -114,7 +114,7 @@ double KL_div(const std::vector<std::vector<double>>& X,
   PointCloud cloud_X{X};
   PointCloud cloud_Y{Y};
   std::vector<double> r = knn_kth_distance(cloud_X, X, k+1);
-  std::vector<double> s = knn_kth_distance(cloud_Y, Y, k);
+  std::vector<double> s = knn_kth_distance(cloud_Y, X, k);
   // Kullback-Leibler divergence
   double mean_log = 0.e0;
   for (size_t i = 0; i < N; i++) mean_log += std::log(s[i] / r[i]);
