@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
+#include "adaptor.hpp"
 #include <boost/math/special_functions/digamma.hpp>
 #include <cmath>
 #include <vector>
@@ -23,11 +24,6 @@ double shannon_entropy(const std::vector<std::vector<double>>& X,
   // KDTree
   PointCloud cloud;
   cloud.pts = X;
-  typedef KDTreeSingleIndexAdaptor<
-    L2_Simple_Adaptor<double, PointCloud>,
-    PointCloud,
-    -1
-  > kd_tree_t;
   kd_tree_t index(d, cloud, KDTreeSingleIndexAdaptorParams(10));
   index.buildIndex();
   // indices and distances
