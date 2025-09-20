@@ -2,9 +2,7 @@
 #define KULLBACK_LEIBLER_DIVERGENCE
 
 
-double KL_div(const std::vector<std::vector<double>>& X,
-              const std::vector<std::vector<double>>& Y,
-              int k = 3);
+double KL_div(double **X_ptr, double **Y_ptr, int k, int d, int N);
 
 #endif
 

@@ -1,5 +1,3 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
 #include "adaptor.hpp"
@@ -9,7 +7,6 @@
 #include "shannon_entropy.hpp"
 
 
-namespace py = pybind11;
 using namespace nanoflann;
 
 
@@ -20,7 +17,7 @@ double shannon_entropy(double **X_ptr, int k, int d, int N) {
   if (N == 0) return 0.e0;
   // KDTree
   double *X = *X_ptr;
-  PointCloud_flat cloud;
+  PointCloud cloud;
   cloud.N   = N;
   cloud.dim = d;
   cloud.pts = X;

@@ -31,15 +31,15 @@ double shannon_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, in
   return shannon_entropy(&x, k, d, N);
 }
 
-/*
+
 double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                       py::array_t<double, py::array::c_style> y_obj, int k=5){
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
-  if (info_x.ndim != 2) {
+  if (info_x.ndim != 2 || info_y.ndim != 2) {
     throw std::runtime_error("Input dimension must be 2");
   }
-  if (info_x.itemsize != sizeof(double)) {
+  if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
   double *x = static_cast<double*>(info_x.ptr);
@@ -49,11 +49,14 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
   ssize_t cols_x = info_x.shape[1];
   int N = static_cast<int>(rows_x);
   int M = static_cast<int>(rows_y);
+  if (N != M) {
+    throw std::runtime_error("Input argument must be the same length");
+  }
   int d = static_cast<int>(cols_x);
   
-  return KL_div(&x, &y, k, d, N, M);
+  return KL_div(&x, &y, k, d, N);
 }
-*/
+
 
 // ============================================================
 // pybind11 module
@@ -63,7 +66,7 @@ PYBIND11_MODULE(shannon_entropy_cpp, m) {
   m.def("shannon_entropy", &shannon_entropy_wrapper,
         py::arg("X"), py::arg("k")=3,
         "Compute Shannon entropy of dataset X using Kozachenko-Leonenko estimator");
-  m.def("KL_div", &KL_div,
+  m.def("KL_div", &KL_div_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=3,
         "Compute Kullback-Leibler divergence of dataset X and Y using Pérez-Cruz");
 }
