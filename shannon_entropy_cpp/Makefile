@@ -22,5 +22,5 @@ kullback_leibler_divergence.o: k_nearest_neighbor.cpp
 shannon_entropy_cpp.o: shannon_entropy.cpp kullback_leibler_divergence.cpp
 
 clean:
-	rm -f $(TARGET)
+	rm -f *.o *.so
 

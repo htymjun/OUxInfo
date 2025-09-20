@@ -1,5 +1,6 @@
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
+//#include "adaptor.hpp"
 #include "knn_resultset.hpp"
 #include <cmath>
 #include <queue>
@@ -10,6 +11,13 @@
 using namespace nanoflann;
 
 
+// PointCloud must be replaced by PointCloud_flat
+typedef KDTreeSingleIndexAdaptor<
+  L2_Simple_Adaptor<double, PointCloud>,
+  PointCloud,
+  -1
+> kd_tree_t;
+
 // ==========================================
 // k-NN distance
 // ==========================================
@@ -19,11 +27,6 @@ std::vector<double> knn_kth_distance(const PointCloud& cloud,
 {
   size_t N = X_query.size();
   size_t d = X_query[0].size();
-  typedef KDTreeSingleIndexAdaptor<
-    L2_Simple_Adaptor<double, PointCloud>,
-    PointCloud,
-    -1
-  > kd_tree_t;
   kd_tree_t index(d, cloud, KDTreeSingleIndexAdaptorParams(10));
   index.buildIndex();
   std::vector<double> kth_dist(N);
@@ -52,11 +55,6 @@ std::vector<double> knn_kth_distance(const PointCloud& cloud,
 {
   size_t N = X_query.size();
   size_t d = X_query[0].size();
-  typedef KDTreeSingleIndexAdaptor<
-    L2_Simple_Adaptor<double, PointCloud>,
-    PointCloud,
-    -1
-  > kd_tree_t;
   kd_tree_t index(d, cloud, KDTreeSingleIndexAdaptorParams(10));
   index.buildIndex();
   std::vector<double> kth_dist(N);
