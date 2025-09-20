@@ -1,6 +1,6 @@
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
-#include "adaptor.hpp"
+//#include "adaptor.hpp"
 #include "knn_resultset.hpp"
 #include <cmath>
 #include <queue>
@@ -10,6 +10,13 @@
 
 using namespace nanoflann;
 
+
+// PointCloud must be replaced by PointCloud_flat
+typedef KDTreeSingleIndexAdaptor<
+  L2_Simple_Adaptor<double, PointCloud>,
+  PointCloud,
+  -1
+> kd_tree_t;
 
 // ==========================================
 // k-NN distance

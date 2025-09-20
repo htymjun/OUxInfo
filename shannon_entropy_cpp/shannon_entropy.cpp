@@ -16,24 +16,23 @@ using namespace nanoflann;
 // ============================================================
 // Shannon entropy
 // ============================================================
-double shannon_entropy(const std::vector<std::vector<double>>& X,
-                       int k) {
-  size_t N = X.size();
+double shannon_entropy(double **X_ptr, int k, int d, int N) {
   if (N == 0) return 0.e0;
-  size_t d = X[0].size();
   // KDTree
-  PointCloud cloud;
+  double *X = *X_ptr;
+  PointCloud_flat cloud;
+  cloud.N   = N;
+  cloud.dim = d;
   cloud.pts = X;
   kd_tree_t index(d, cloud, KDTreeSingleIndexAdaptorParams(10));
   index.buildIndex();
   // indices and distances
   std::vector<size_t> ret_index(k+1);
   std::vector<double> out_dist_sqr(k+1);
-  double* query_pt = new double[d];
   // epsilong and E(log(epsilon))
   double eps, mean_log_eps = 0.e0;
   for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < d; j++) query_pt[j] = X[i][j];
+    double *query_pt = &X[i*d];
     KNNResultSet<double> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist_sqr.data());
     index.findNeighbors(resultSet, query_pt, SearchParameters(10));
@@ -41,7 +40,6 @@ double shannon_entropy(const std::vector<std::vector<double>>& X,
     mean_log_eps += std::log(eps);
   }
   mean_log_eps /= N;
-  delete[] query_pt;
   // volume of unit ball C_d
   double pi = acos(-1.e0);
   double Cd = std::pow(pi, 0.5e0 * d) / std::tgamma(1.e0 + 0.5e0 * d) / std::pow(2.e0, d);

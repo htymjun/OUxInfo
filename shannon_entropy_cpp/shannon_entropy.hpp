@@ -2,8 +2,7 @@
 #define SHANNON_ENTROPY_HPP
 
 
-double shannon_entropy(const std::vector<std::vector<double>>& X,
-                       int k = 3);
+double shannon_entropy(double **X_ptr, int k, int d, int N);
 
 #endif
 

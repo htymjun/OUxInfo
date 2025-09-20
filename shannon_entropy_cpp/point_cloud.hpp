@@ -23,7 +23,7 @@ struct PointCloud {
 struct PointCloud_flat {
   size_t N;
   size_t dim;
-  std::vector<double> pts;
+  double *pts;
   inline double kdtree_get_pt(const size_t idx, const size_t dim_) const {
     return pts[idx*dim + dim_];
   }
