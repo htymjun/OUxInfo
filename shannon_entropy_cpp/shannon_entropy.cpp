@@ -8,6 +8,7 @@
 
 
 using namespace nanoflann;
+using boost::math::digamma;
 
 
 // ============================================================
@@ -18,9 +19,7 @@ double shannon_entropy(double **X_ptr, int k, int d, int N) {
   // KDTree
   double *X = *X_ptr;
   PointCloud cloud;
-  cloud.N   = N;
-  cloud.dim = d;
-  cloud.pts = X;
+  cloud.N = N; cloud.dim = d; cloud.pts = X;
   kd_tree_t index(d, cloud, KDTreeSingleIndexAdaptorParams(10));
   index.buildIndex();
   // indices and distances
@@ -42,8 +41,7 @@ double shannon_entropy(double **X_ptr, int k, int d, int N) {
   double pi = acos(-1.e0);
   double Cd = std::pow(pi, 0.5e0 * d) / std::tgamma(1.e0 + 0.5e0 * d) / std::pow(2.e0, d);
   // Shannon entropy
-  double H = - boost::math::digamma(double(k)) + boost::math::digamma(double(N)) 
-              + std::log(Cd) + d * mean_log_eps;
+  double H = - digamma(k) + digamma(N) + std::log(Cd) + d * mean_log_eps;
   return H;
 }
 

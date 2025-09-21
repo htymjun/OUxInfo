@@ -1,7 +1,6 @@
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
 #include "adaptor.hpp"
-#include <boost/math/special_functions/digamma.hpp>
 #include <cmath>
 #include <vector>
 
@@ -17,12 +16,8 @@ double KL_div(double **X_ptr, double **Y_ptr, int k, int d, int N) {
   double *X = *X_ptr;
   double *Y = *Y_ptr;
   PointCloud cloud_X, cloud_Y;
-  cloud_X.N   = N;
-  cloud_Y.N   = N;
-  cloud_X.dim = d;
-  cloud_Y.dim = d;
-  cloud_X.pts = X;
-  cloud_Y.pts = Y;
+  cloud_X.N = N; cloud_X.dim = d; cloud_X.pts = X;
+  cloud_Y.N = N; cloud_Y.dim = d; cloud_Y.pts = Y;
   kd_tree_t index_X(d, cloud_X, KDTreeSingleIndexAdaptorParams(10));
   kd_tree_t index_Y(d, cloud_Y, KDTreeSingleIndexAdaptorParams(10));
   index_X.buildIndex();
