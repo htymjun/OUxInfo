@@ -6,6 +6,7 @@ LDFLAGS = -shared
 TARGET = shannon_entropy_cpp$(shell $(PYTHON)-config --extension-suffix)
 SRC = shannon_entropy.cpp \
       kullback_leibler_divergence.cpp \
+      mutual_information.cpp \
       shannon_entropy_cpp.cpp
 OBJ = $(SRC:.cpp=.o)
 
@@ -19,7 +20,8 @@ $(TARGET): $(OBJ)
 
 shannon_entropy.o: point_cloud.hpp adaptor.hpp
 kullback_leibler_divergence.o: point_cloud.hpp adaptor.hpp
-shannon_entropy_cpp.o: shannon_entropy.cpp kullback_leibler_divergence.cpp
+mutual_information.o: point_cloud.hpp adaptor.hpp
+shannon_entropy_cpp.o: shannon_entropy.cpp kullback_leibler_divergence.cpp mutual_information.cpp
 
 clean:
 	rm -f *.o *.so

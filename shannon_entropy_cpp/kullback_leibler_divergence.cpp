@@ -1,7 +1,6 @@
 #include "nanoflann.hpp"
 #include "point_cloud.hpp"
 #include "adaptor.hpp"
-#include <boost/math/special_functions/digamma.hpp>
 #include <cmath>
 #include <vector>
 
@@ -17,12 +16,8 @@ double KL_div(double **X_ptr, double **Y_ptr, int k, int d, int N) {
   double *X = *X_ptr;
   double *Y = *Y_ptr;
   PointCloud cloud_X, cloud_Y;
-  cloud_X.N   = N;
-  cloud_Y.N   = N;
-  cloud_X.dim = d;
-  cloud_Y.dim = d;
-  cloud_X.pts = X;
-  cloud_Y.pts = Y;
+  cloud_X.N = N; cloud_X.dim = d; cloud_X.pts = X;
+  cloud_Y.N = N; cloud_Y.dim = d; cloud_Y.pts = Y;
   kd_tree_t index_X(d, cloud_X, KDTreeSingleIndexAdaptorParams(10));
   kd_tree_t index_Y(d, cloud_Y, KDTreeSingleIndexAdaptorParams(10));
   index_X.buildIndex();
@@ -38,12 +33,14 @@ double KL_div(double **X_ptr, double **Y_ptr, int k, int d, int N) {
     KNNResultSet<double> resultSet_X(k+1);
     resultSet_X.init(ret_index.data(), out_dist_sqr.data());
     index_X.findNeighbors(resultSet_X, query_pt, SearchParameters(10));
-    double r = std::sqrt(out_dist_sqr[k]);
+    //double r = std::sqrt(out_dist_sqr[k]);
+    double r = out_dist_sqr[k];
     // Y-tree (k)
     KNNResultSet<double> resultSet_Y(k);
     resultSet_Y.init(ret_index.data(), out_dist_sqr.data());
     index_Y.findNeighbors(resultSet_Y, query_pt, SearchParameters(10));
-    double s = std::sqrt(out_dist_sqr[k-1]);
+    //double s = std::sqrt(out_dist_sqr[k-1]);
+    double s = out_dist_sqr[k-1];
     mean_log += std::log(s / r);
   }
   mean_log /= N;
