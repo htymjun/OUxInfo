@@ -78,8 +78,7 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   int dx = static_cast<int>(cols_x);
   int dy = static_cast<int>(cols_y);
   
-  return mutual_info(&x, &y, k, dx, dy, N);
-}
+  return mutual_info(&x, &y, k, dx, dy, N);}
 
 
 // ============================================================
