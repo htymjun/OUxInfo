@@ -5,6 +5,9 @@
 #include <cmath>
 
 
+using namespace nanoflann;
+
+
 // --- Chebyshev (L-infty) distance adaptor for nanoflann ---
 // Compatible with nanoflann internals: provides ElementType, DistanceType, ResultType,
 // evalMetric(const ElementType*, const ElementType*, size_t),
@@ -76,12 +79,4 @@ struct Chebyshev_Adaptor {
     return dist;
   }
 };
-
-
-typedef KDTreeSingleIndexAdaptor<
-  //L2_Simple_Adaptor<double, PointCloud>,
-  Chebyshev_Adaptor<double, PointCloud>,
-  PointCloud,
-  -1
-> kd_tree_t;
 
