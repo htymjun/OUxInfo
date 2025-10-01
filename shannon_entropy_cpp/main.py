@@ -14,7 +14,7 @@ t2 = time.time()
 print("Theoretical:", Ht, " Numerical:", Hn)
 print("Elapsed time:", t2-t1)
 
-
+'''
 var_x = 1.e0
 var_y = 9.e0
 cov   = 1.e0
@@ -29,4 +29,4 @@ Dn = KL_div(x.reshape(-1,1), x.reshape(-1,1), k=3)
 t2 = time.time()
 print("Theoretical:", Dt, " Numerical:", Dn)
 print("Elapsed time:", t2-t1)
-
+'''

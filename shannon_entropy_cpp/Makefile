@@ -1,13 +1,25 @@
 CXX = g++
-CXXFLAGS = -Ofast -std=c++14 -fPIC $(shell python3 -m pybind11 --includes)
+PYTHON = python3.13
+CXXFLAGS = -Ofast -std=c++14 -fPIC $(shell $(PYTHON) -m pybind11 --includes)
 LDFLAGS = -shared
 
-TARGET = shannon_entropy_cpp$(shell python3-config --extension-suffix)
+TARGET = shannon_entropy_cpp$(shell $(PYTHON)-config --extension-suffix)
 SRC = shannon_entropy_cpp.cpp
+OBJ = $(SRC:.cpp=.o)
 
-all:
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+all: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+shannon_entropy.hpp: point_cloud.hpp adaptor.hpp
+kullback_leibler_divergence.hpp: point_cloud.hpp adaptor.hpp
+mutual_information.hpp: point_cloud.hpp adaptor.hpp
+shannon_entropy_cpp.o: shannon_entropy.hpp kullback_leibler_divergence.hpp mutual_information.hpp
 
 clean:
-	rm -f $(TARGET)
+	rm -f *.o *.so
 
