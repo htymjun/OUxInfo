@@ -4,6 +4,7 @@ from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 from shannon_entropy_cpp import mutual_info
+from shannon_entropy_cpp import mutual_info_noeps
 import time
 from scipy.special import digamma
 
@@ -20,19 +21,23 @@ def mutual_info_py(X, Y, k=5, Thei=10):
   X, _ = reshape_matrix(X)
   Y, _ = reshape_matrix(Y)
   N = X.shape[0]
-  nX, nY, nN = np.zeros(N), np.zeros(N), np.zeros(N)
+  nX, nY, nN, epsC = np.zeros(N), np.zeros(N), np.zeros(N), np.zeros(N)
+  eps_all = 0
   for i in range(N):
     idx = np.ones(N, dtype=bool)
     idx[max(0, i - Thei):min(i + Thei + 1, N)] = False
     tree_XY = KDTree(np.hstack((X[idx], Y[idx])))
     dist, _ = tree_XY.query(np.hstack((X[i], Y[i])), k=k, p=np.inf, workers=-1)
     half_epsilon_XYkNN = dist[-1]
+    eps_all += half_epsilon_XYkNN
     nX[i] = np.sum(cdist(X[idx], X[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
     nY[i] = np.sum(cdist(Y[idx], Y[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
     nN[i] = np.sum(idx)
+    epsC[i] = half_epsilon_XYkNN
+  print("eps_mean_py1:",eps_all/N)
   valid_idx = (nX > 0) & (nY > 0)
   I = psi(k) - np.mean(psi(nX[valid_idx] + 1)) - np.mean(psi(nY[valid_idx] + 1)) + np.mean(psi(nN[valid_idx] + 1))
-  return I 
+  return I, epsC
 
 def mutual_info_py2(x, y, k=5):
     
@@ -50,10 +55,10 @@ def mutual_info_py2(x, y, k=5):
     tree_y  = KDTree(y)
 
     # (k+1)-th 最近傍距離を取得 (自身を含むので+1)
-    d_xy, _ = tree_xy.query(xy, k+1, p=np.inf)  # Chebyshev 距離 (max norm)
+    d_xy, _ = tree_xy.query(xy, k+1, p=np.inf, workers=-1)  # Chebyshev 距離 (max norm)
     d = d_xy[:,-1]
     d_mean = np.mean(d)
-    print("eps_mean_py:", d_mean)
+    print("eps_mean_py2:", d_mean)
 
     # 近傍数をカウント
         # 1. 結果を保存するための空のリストを用意する
@@ -112,6 +117,7 @@ var_y = 25.e0
 cov = 10
 It = 0.0
 In = 0.0
+In2 = 0.0
 Ic = 0.0
 mean = (0.e0, 0.e0)
 rho  = cov / (np.sqrt(var_x * var_y)) # corr coef
@@ -124,13 +130,21 @@ X, dx = reshape_matrix(x[:,0])
 Y, dy = reshape_matrix(x[:,1])
 N = X.shape[0]
 
-print("Theoretical:", It)
+print("Theoretical  :", It)
 t1 = time.time()
-In = mutual_info_py2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
+In, eps = mutual_info_py(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
 t2 = time.time()
-print("python:", In)
-Ic = mutual_info(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)  
+print("python1      :", In)
+In2 = mutual_info_py2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
 t3 = time.time()
-print("C++:", Ic)
-print("Elapsed time py:", t2-t1)
-print("Elapsed time C++:", t3-t2)
+print("python2      :", In2)
+Ic1 = mutual_info(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
+t4 = time.time()
+Ic2 = mutual_info_noeps(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), eps = eps,k=10)  
+t5 = time.time()
+print("C++          :", Ic1)
+print("C++ eps by py:", Ic2)
+print("Elapsed time py1           :", t2-t1)
+print("Elapsed time py2           :", t3-t2)
+print("Elapsed time C++           :", t4-t3)
+print("Elapsed time C++ eps by py :", t5-t4)

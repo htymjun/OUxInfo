@@ -42,13 +42,13 @@ T KL_div(T **X_ptr, T **Y_ptr, int k, int d, int N) {
     // X-tree (k+1)
     KNNResultSet<T> resultSet_X(k+1);
     resultSet_X.init(ret_index.data(), out_dist_sqr.data());
-    index_X.findNeighbors(resultSet_X, query_pt, SearchParameters(10));
+    index_X.findNeighbors(resultSet_X, query_pt, SearchParameters(0));
     //T r = std::sqrt(out_dist_sqr[k]);
     T r = out_dist_sqr[k];
     // Y-tree (k)
     KNNResultSet<T> resultSet_Y(k);
     resultSet_Y.init(ret_index.data(), out_dist_sqr.data());
-    index_Y.findNeighbors(resultSet_Y, query_pt, SearchParameters(10));
+    index_Y.findNeighbors(resultSet_Y, query_pt, SearchParameters(0));
     //T s = std::sqrt(out_dist_sqr[k-1]);
     T s = out_dist_sqr[k-1];
     mean_log += std::log(s / r);
