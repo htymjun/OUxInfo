@@ -40,7 +40,7 @@ T shannon_entropy(T **X_ptr, int k, int d, int N) {
     T *query_pt = &X[i*d];
     KNNResultSet<T> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist_sqr.data());
-    index.findNeighbors(resultSet, query_pt, SearchParameters(10));
+    index.findNeighbors(resultSet, query_pt, SearchParameters(0));
     //eps = 2.e0 * std::sqrt(out_dist_sqr[k]);
     eps = 2.e0 * out_dist_sqr[k];
     mean_log_eps += std::log(eps);
