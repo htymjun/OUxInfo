@@ -3,6 +3,9 @@ from shannon_entropy_cpp import shannon_entropy
 from scipy.special import psi, gamma
 from scipy.spatial import KDTree
 import time
+import cupy as cp
+from cuml.neighbors import NearestNeighbors
+
 
 def count_points1(tree_X, tree_XY, X, XY, k, Thei=1):
   N   = X.shape[0]
@@ -45,19 +48,85 @@ def shannon_entropy_py(X, k=3, Thei=1, Z=None):
     H = -psi(k) + psi(N) + np.log(Cdx) + dx * np.mean(np.log(eps))
   return H
 
+def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
+  # Kozachenko Leonenko
+  X = cp.asarray(X, dtype=cp.float32)
+  X_gpu = X.reshape(-1, 1)
+  N = X.shape[0]
+  dx = X_gpu.shape[1]
+
+    # 最近傍探索 (L∞距離)
+  nn = NearestNeighbors(n_neighbors=k+1, algorithm='brute', metric='chebyshev')
+  nn.fit(X_gpu)
+  dist, _ = nn.kneighbors(X_gpu)
+
+    # k+1番目の距離（自身を除外）
+  eps = 2.0 * dist[:, -1]
+  eps = cp.where(eps <= 0, 1e-12, eps)
+  Cdx = np.pi**(0.5e0*dx) / gamma(1.e0 + 0.5e0 * dx) / 2.e0**dx
+
+  H = -psi(k) + psi(N) + np.log(Cdx) + dx * cp.mean(cp.log(eps)) # Use cp.mean and cp.log for CuPy array
+  return cp.asnumpy(H) # Convert back to numpy for return value
+
+#メモリ食いすぎで計算できてない
+def shannon_entropy_rp_cupy(X, k=3):
+    """
+    CuPyを用いたKozachenko–Leonenko法によるシャノンエントロピー推定
+    （最近傍探索をscikit-learnではなくcp.cdistで自作）
+    """
+    # --- GPU配列に変換 ---
+    X = cp.asarray(X, dtype=cp.float32)
+    N, d = X.shape if X.ndim > 1 else (X.size, 1)
+    X = X.reshape(N, d)
+
+    # --- L∞距離（Chebyshev距離）を計算 ---
+    # cdist の metric='chebyshev' は CuPy では未サポートなので自前で定義
+    # |x_i - x_j| の絶対値の最大値を取る
+    diff = cp.abs(X[:, None, :] - X[None, :, :])   # shape (N, N, d)
+    dist = cp.max(diff, axis=2)                    # shape (N, N)
+
+    # --- 自分自身との距離を無限大にして除外 ---
+    cp.fill_diagonal(dist, cp.inf)
+
+    # --- 各点におけるk番目の最近傍距離を取得 ---
+    # cp.partition は部分ソート（全ソートより高速）
+    kth_dist = cp.partition(dist, k-1, axis=1)[:, k-1]
+
+    # --- eps: ボール半径（L∞距離なので2倍する） ---
+    eps = 2.0 * kth_dist
+    eps = cp.where(eps <= 0, 1e-12, eps)
+
+    # --- 定数項（単位球体の体積係数）---
+    C_d = (np.pi ** (0.5 * d)) / gamma(1.0 + 0.5 * d) / (2.0 ** d)
+
+    # --- Kozachenko–Leonenko 推定式 ---
+    H = -psi(k) + psi(N) + np.log(C_d) + d * cp.mean(cp.log(eps))
+
+    # --- 結果をCPU側へ戻す ---
+    return float(cp.asnumpy(H))
+
+
 N = 1000
 s = 1.e0
 x = np.random.normal(0.e0, s, N)
 Ht = 0.5e0 * (1.e0 + np.log(2.e0 * np.pi * s**2))
 
 t1 = time.time()
-Hn = shannon_entropy_py(x, k=3)
+Hn1 = shannon_entropy_py(x, k=3)
 t2 = time.time()
-Hc = shannon_entropy(x.reshape(-1,1), k=3)
+Hn2 = shannon_entropy_rp(x, k=3)
 t3 = time.time()
+Hn3 = shannon_entropy_rp_cupy(x, k=3)
+t4 = time.time()
+Hc = shannon_entropy(x.reshape(-1,1), k=3)
+t5 = time.time()
 
 print("Theoretical:", Ht)
-print("python:", Hn)
-print("c++:", Hc)
-print("Elapsed time python:", t2-t1)
-print("Elapsed time c++:", t3-t2)
+print("python     :", Hn1)
+print("python rp  :", Hn2)
+print("python rpc :", Hn3)
+print("c++        :", Hc)
+print("time python            :", t2-t1)
+print("time python rapids     :", t3-t2)
+print("time python rapids cupy:", t4-t3)
+print("time c++:", t5-t4)
