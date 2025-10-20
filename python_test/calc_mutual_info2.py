@@ -3,10 +3,7 @@ from scipy.special import psi, gamma
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
-from shannon_entropy_cpp import mutual_info
-from shannon_entropy_cpp import mutual_info2
-from shannon_entropy_cpp import mutual_info_noeps
-
+from tqdm import tqdm
 import time
 from scipy.special import digamma
 
@@ -19,7 +16,7 @@ def reshape_matrix(X):
     dx = X.shape[1]
   return X, dx
 
-def mutual_info_py1(X, Y, k=5, Thei=10):
+def mutual_info1(X, Y, k=5, Thei=10):
     X, _ = reshape_matrix(X)
     Y, _ = reshape_matrix(Y)
     N = X.shape[0]
@@ -41,7 +38,7 @@ def mutual_info_py1(X, Y, k=5, Thei=10):
     
     return I
 
-def mutual_info_py2(X, Y, k=5, Thei=10):
+def mutual_info2(X, Y, k=5, Thei=10):
   X, _ = reshape_matrix(X)
   Y, _ = reshape_matrix(Y)
   N = X.shape[0]
@@ -57,31 +54,9 @@ def mutual_info_py2(X, Y, k=5, Thei=10):
     nN[i] = np.sum(idx)
   valid_idx = (nX > 0) & (nY > 0)
   I = psi(k) - np.mean(psi(nX[valid_idx] + 1)) - np.mean(psi(nY[valid_idx] + 1)) + np.mean(psi(nN[valid_idx] + 1))
-  return I
+  return I 
 
-def mutual_info_py2_eps(X, Y, k=5, Thei=10):
-  X, _ = reshape_matrix(X)
-  Y, _ = reshape_matrix(Y)
-  N = X.shape[0]
-  nX, nY, nN, epsC = np.zeros(N), np.zeros(N), np.zeros(N), np.zeros(N)
-  eps_all = 0
-  for i in range(N):
-    idx = np.ones(N, dtype=bool)
-    idx[max(0, i - Thei):min(i + Thei + 1, N)] = False
-    tree_XY = KDTree(np.hstack((X[idx], Y[idx])))
-    dist, _ = tree_XY.query(np.hstack((X[i], Y[i])), k=k, p=np.inf, workers=-1)
-    half_epsilon_XYkNN = dist[-1]
-    eps_all += half_epsilon_XYkNN
-    nX[i] = np.sum(cdist(X[idx], X[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
-    nY[i] = np.sum(cdist(Y[idx], Y[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
-    nN[i] = np.sum(idx)
-    epsC[i] = half_epsilon_XYkNN
-  print("eps_mean_py1:",eps_all/N)
-  valid_idx = (nX > 0) & (nY > 0)
-  I = psi(k) - np.mean(psi(nX[valid_idx] + 1)) - np.mean(psi(nY[valid_idx] + 1)) + np.mean(psi(nN[valid_idx] + 1))
-  return I, epsC
-
-def mutual_info_py3(x, y, k=5):
+def mutual_info3(x, y, k=5):
     
     x = np.atleast_2d(x).T if x.ndim == 1 else x
     y = np.atleast_2d(y).T if y.ndim == 1 else y
@@ -99,8 +74,6 @@ def mutual_info_py3(x, y, k=5):
     # (k+1)-th 最近傍距離を取得 (自身を含むので+1)
     d_xy, _ = tree_xy.query(xy, k+1, p=np.inf, workers=-1)  # Chebyshev 距離 (max norm)
     d = d_xy[:,-1]
-    d_mean = np.mean(d)
-    print("eps_mean_py2:", d_mean)
 
     # 近傍数をカウント
         # 1. 結果を保存するための空のリストを用意する
@@ -154,58 +127,83 @@ def mutual_info_py3(x, y, k=5):
     mi = digamma(k) + digamma(n) - np.mean(digamma(nx+1) + digamma(ny+1))
     return mi
 
-var_x = 9.e0
-var_y = 25.e0
-cov = 10
-It = 0.0
-In = 0.0
-In2 = 0.0
-Ic = 0.0
-mean = (0.e0, 0.e0)
-rho  = cov / (np.sqrt(var_x * var_y)) # corr coef
-Cov  = [[var_x, cov], \
+
+
+def test_mutual_info1():
+  # variance
+  var_x = 9.e0
+  var_y = 25.e0
+  covariance = np.linspace(0.e0, 10.e0, 50)
+  mean = (0.e0, 0.e0)
+  It   = np.zeros(len(covariance))
+  In   = np.zeros(len(covariance))
+  t1 = time.time()
+  for i, cov in enumerate(covariance):
+    rho  = cov / (np.sqrt(var_x * var_y)) # corr coef
+    Cov  = [[var_x, cov], \
             [cov, var_y]]
-x = np.random.multivariate_normal(mean, Cov, 10000)
-It = -0.5e0 * np.log(1.e0 - rho**2)
+    x = np.random.multivariate_normal(mean, Cov, 2000)
+    It[i] = -0.5e0 * np.log(1.e0 - rho**2)
+    In[i] = mutual_info1(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
+  t2 = time.time()
+  print("time:",t2-t1)
+  plt.figure(figsize=(6,6))
+  plt.plot(covariance, It, color='black')
+  plt.plot(covariance, In, "o", color='blue')
+  plt.xlabel(r'$\sigma_{xy}$', fontsize=18, style='italic')
+  plt.ylabel("I(X;Y)", fontsize=18)
+  plt.savefig("mutual_info2_1.png")
 
-X, dx = reshape_matrix(x[:,0])
-Y, dy = reshape_matrix(x[:,1])
-N = X.shape[0]
-k = 5
-print("Theoretical  :", It)
-t1 = time.time()
-In = mutual_info_py1(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t2 = time.time()
-print("python1      :", In)
+def test_mutual_info2():
+  # variance
+  var_x = 9.e0
+  var_y = 25.e0
+  covariance = np.linspace(0.e0, 10.e0, 50)
+  mean = (0.e0, 0.e0)
+  It   = np.zeros(len(covariance))
+  In   = np.zeros(len(covariance))
+  t3 = time.time()
+  for i, cov in enumerate(covariance):
+    rho  = cov / (np.sqrt(var_x * var_y)) # corr coef
+    Cov  = [[var_x, cov], \
+            [cov, var_y]]
+    x = np.random.multivariate_normal(mean, Cov, 2000)
+    It[i] = -0.5e0 * np.log(1.e0 - rho**2)
+    In[i] = mutual_info2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
+  t4 = time.time()
+  print("time:",t4-t3)
+  plt.figure(figsize=(6,6))
+  plt.plot(covariance, It, color='black')
+  plt.plot(covariance, In, "o", color='blue')
+  plt.xlabel(r'$\sigma_{xy}$', fontsize=18, style='italic')
+  plt.ylabel("I(X;Y)", fontsize=18)
+  plt.savefig("mutual_info2_2.png")
 
-In2 = mutual_info_py2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t3 = time.time()
-print("python2      :", In2)
+def test_mutual_info3():
+  # variance
+  var_x = 9.e0
+  var_y = 25.e0
+  covariance = np.linspace(0.e0, 10.e0, 50)
+  mean = (0.e0, 0.e0)
+  It   = np.zeros(len(covariance))
+  In   = np.zeros(len(covariance))
+  t5 = time.time()
+  for i, cov in enumerate(covariance):
+    rho  = cov / (np.sqrt(var_x * var_y)) # corr coef
+    Cov  = [[var_x, cov], \
+            [cov, var_y]]
+    x = np.random.multivariate_normal(mean, Cov, 2000)
+    It[i] = -0.5e0 * np.log(1.e0 - rho**2)
+    In[i] = mutual_info2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=10)
+  t6 = time.time()
+  print("time:",t6-t5)
+  plt.figure(figsize=(6,6))
+  plt.plot(covariance, It, color='black')
+  plt.plot(covariance, In, "o", color='blue')
+  plt.xlabel(r'$\sigma_{xy}$', fontsize=18, style='italic')
+  plt.ylabel("I(X;Y)", fontsize=18)
+  plt.savefig("mutual_info2_3.png")
 
-In2, eps = mutual_info_py2_eps(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t4 = time.time()
-print("python2      :", In2)
-
-In3 = mutual_info_py3(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t5 = time.time()
-print("python2      :", In3)
-
-Ic1 = mutual_info(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t6 = time.time()
-print("C++          :", Ic1)
-
-Ic2 = mutual_info2(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), k=k)
-t7 = time.time()
-print("C++          :", Ic2)
-
-#Ic2 = mutual_info_noeps(x[:,0].reshape(-1,1), x[:,1].reshape(-1,1), eps = eps,k=10)  
-#t6 = time.time()
-#print("C++ eps by py:", Ic2)
-
-print("Elapsed time py1           :", t2-t1)
-print("Elapsed time py2           :", t3-t2)
-print("Elapsed time py2 eps       :", t4-t3)
-print("Elapsed time py3           :", t5-t4)
-print("Elapsed time C++           :", t6-t5)
-print("Elapsed time C++2          :", t7-t6)
-#print("Elapsed time C++ eps by py :", t6-t5)
+test_mutual_info1()
+test_mutual_info2()
+test_mutual_info3()
