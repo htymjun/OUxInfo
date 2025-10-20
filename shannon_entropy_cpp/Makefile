@@ -1,5 +1,5 @@
 CXX = g++
-PYTHON = python3.13
+PYTHON = python3.12
 CXXFLAGS = -Ofast -std=c++14 -fPIC $(shell $(PYTHON) -m pybind11 --includes)
 LDFLAGS = -shared
 

@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "nanoflann.hpp"
+#include "adaptor.hpp"
 #include <vector>
 #include <stdexcept>
 
@@ -10,6 +11,7 @@ using namespace nanoflann;
 // =====================================
 // 点群データのラッパー
 // =====================================
+/*
 struct PointCloud {
   std::vector<std::vector<double>> pts;
   inline size_t kdtree_get_point_count() const { return pts.size(); }
@@ -21,7 +23,7 @@ struct PointCloud {
   template <class BBOX>
   bool kdtree_get_bbox(BBOX&) const { return false; }
 };
-
+*/
 // =====================================
 // k-NN 探索関数
 // =====================================
@@ -35,6 +37,18 @@ py::tuple knn_search(py::array_t<double, py::array::c_style | py::array::forceca
   size_t N = X.shape(0);
   size_t d = X.shape(1);
 
+  PointCloud cloud;
+  cloud.N   = N;
+  cloud.dim = d;
+  cloud.pts = new double[N * d];
+
+  auto X_unchecked = X.unchecked<2>();
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < d; j++) {
+      cloud.pts[i * d + j] = X_unchecked(i, j);
+    }
+  }
+  /*
   // PointCloud にコピー
   PointCloud cloud;
   cloud.pts.resize(N);
@@ -44,10 +58,11 @@ py::tuple knn_search(py::array_t<double, py::array::c_style | py::array::forceca
     for (size_t j = 0; j < d; j++)
       cloud.pts[i][j] = X_unchecked(i,j);
   }
-
+  */
   // nanoflann KDTree
   typedef KDTreeSingleIndexAdaptor<
-    L2_Simple_Adaptor<double, PointCloud>,
+    //L2_Simple_Adaptor<double, PointCloud>,
+    Chebyshev_Adaptor<double, PointCloud>,
     PointCloud,
     -1 /* dim at runtime */
   > kd_tree_t;
@@ -61,22 +76,25 @@ py::tuple knn_search(py::array_t<double, py::array::c_style | py::array::forceca
   auto inds = indices.mutable_unchecked<1>();
   auto dsts = dists.mutable_unchecked<1>();
 
-  std::vector<size_t> ret_index(k);
-  std::vector<double> out_dist_sqr(k);
+  std::vector<size_t> ret_index(k+1);
+  std::vector<double> out_dist_sqr(k+1);
 
   double *query_pt = new double[d];
 
   for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < d; j++) query_pt[j] = cloud.pts[i][j];
+    for (size_t j = 0; j < d; j++) 
+    query_pt[j] = cloud.pts[i * d + j];
 
-    KNNResultSet<double> resultSet(k);
+    KNNResultSet<double> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist_sqr.data());
-    index.findNeighbors(resultSet, query_pt, nanoflann::SearchParameters(10));
-    inds(i) = ret_index[k-1];
-    dsts(i) = std::sqrt(out_dist_sqr[k-1]);
+    index.findNeighbors(resultSet, query_pt, nanoflann::SearchParameters(0));
+    inds(i) = ret_index[k];
+    //dsts(i) = std::sqrt(out_dist_sqr[k-1]);
+    dsts(i) = out_dist_sqr[k];
   }
 
   delete[] query_pt;
+  delete[] cloud.pts; 
   return py::make_tuple(indices, dists);
 }
 
