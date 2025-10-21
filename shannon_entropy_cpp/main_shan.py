@@ -1,9 +1,10 @@
 import numpy as np
 from shannon_entropy_cpp import shannon_entropy
-from scipy.special import psi, gamma
+from scipy.special import psi as psi_c, gamma as gamma_c
 from scipy.spatial import KDTree
 import time
 import cupy as cp
+from cupyx.scipy.special import psi as psi_g, gamma as gamma_g
 import faiss
 from cuml.neighbors import NearestNeighbors
 
@@ -37,16 +38,16 @@ def shannon_entropy_py(X, k=3, Thei=1, Z=None):
   eps = np.zeros(N)
   tree_X = KDTree(X)
   # volume of unit ball in d*n
-  Cdx = np.pi**(0.5e0*dx) / gamma(1.e0 + 0.5e0 * dx) / 2.e0**dx
+  Cdx = np.pi**(0.5e0*dx) / gamma_c(1.e0 + 0.5e0 * dx) / 2.e0**dx
   if Z is not None:
     Z, _ = reshape_matrix(Z)
     nx, eps = count_points1(tree_X, KDTree(Z), X, Z, k=k, Thei=Thei)
-    H = np.mean(-psi(nx + 1.e0) + dx * np.log(eps)) + psi(N) + np.log(Cdx)
+    H = np.mean(-psi_c(nx + 1.e0) + dx * np.log(eps)) + psi_c(N) + np.log(Cdx)
   else:
     for i in range(N):
       distance, _ = tree_X.query(X[i], k=k+1, p=np.inf)
       eps[i] = 2.e0 * distance[-1]
-    H = -psi(k) + psi(N) + np.log(Cdx) + dx * np.mean(np.log(eps))
+    H = -psi_c(k) + psi_c(N) + np.log(Cdx) + dx * np.mean(np.log(eps))
   return H
 
 def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
@@ -64,9 +65,9 @@ def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
     # k+1番目の距離（自身を除外）
   eps = 2.0 * dist[:, -1]
   eps = cp.where(eps <= 0, 1e-12, eps)
-  Cdx = np.pi**(0.5e0*dx) / gamma(1.e0 + 0.5e0 * dx) / 2.e0**dx
+  Cdx = cp.pi**(0.5e0*dx) / gamma_g(1.e0 + 0.5e0 * dx) / 2.e0**dx 
 
-  H = -psi(k) + psi(N) + np.log(Cdx) + dx * cp.mean(cp.log(eps)) # Use cp.mean and cp.log for CuPy array
+  H = -psi_g(k) + psi_g(N) + cp.log(Cdx) + dx * cp.mean(cp.log(eps))
   return cp.asnumpy(H) # Convert back to numpy for return value
 
 #メモリ食いすぎで計算できてない
@@ -179,7 +180,7 @@ def shannon_entropy_rp_cupy_faiss(X, k=3):
     return float(H)
 
 
-N = 10000000
+N = 2000000
 s = 1.e0
 x = np.random.normal(0.e0, s, N)
 Ht = 0.5e0 * (1.e0 + np.log(2.e0 * np.pi * s**2))
