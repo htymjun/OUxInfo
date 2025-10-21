@@ -4,6 +4,7 @@ from scipy.special import psi, gamma
 from scipy.spatial import KDTree
 import time
 import cupy as cp
+import faiss
 from cuml.neighbors import NearestNeighbors
 
 
@@ -105,8 +106,80 @@ def shannon_entropy_rp_cupy(X, k=3):
     # --- 結果をCPU側へ戻す ---
     return float(cp.asnumpy(H))
 
+def shannon_entropy_rp_cupy_batch(X, k=3,batch_size=2000):
+    """
+    CuPyを用いたKozachenko–Leonenko法によるシャノンエントロピー推定
+    （最近傍探索をscikit-learnではなくcp.cdistで自作）
+    """
+    # --- GPU配列に変換 ---
+    X = cp.asarray(X, dtype=cp.float32)
+    N, d = X.shape if X.ndim > 1 else (X.size, 1)
+    X = X.reshape(N, d)
 
-N = 1000
+    kth_dist = cp.full(N, cp.inf, dtype=cp.float32)
+
+    for i in range(0, N, batch_size):
+        X_batch = X[i:i+batch_size]
+        diff = cp.abs(X_batch[:, None, :] - X[None, :, :])
+        dist = cp.max(diff, axis=2)
+        cp.fill_diagonal(dist[:min(batch_size, N - i), i:i+min(batch_size, N - i)], cp.inf)
+        kth_local = cp.partition(dist, k-1, axis=1)[:, k-1]
+        kth_dist[i:i+batch_size] = kth_local
+        del diff, dist, X_batch
+        cp._default_memory_pool.free_all_blocks()
+
+    # --- eps: ボール半径（L∞距離なので2倍する） ---
+    eps = 2.0 * kth_dist
+    eps = cp.where(eps <= 0, 1e-12, eps)
+
+    # --- 定数項（単位球体の体積係数）---
+    C_d = (np.pi ** (0.5 * d)) / gamma(1.0 + 0.5 * d) / (2.0 ** d)
+
+    # --- Kozachenko–Leonenko 推定式 ---
+    H = -psi(k) + psi(N) + np.log(C_d) + d * cp.mean(cp.log(eps))
+
+    # --- 結果をCPU側へ戻す ---
+    return float(cp.asnumpy(H))
+
+
+#versionが合わずうまくいかなかった
+def shannon_entropy_rp_cupy_faiss(X, k=3):
+    
+    #CuPyを用いたKozachenko–Leonenko法によるシャノンエントロピー推定
+    #（最近傍探索をscikit-learnではなくcp.cdistで自作）
+
+    # --- GPU配列に変換 ---
+    X = cp.asarray(X, dtype=cp.float32)
+    N, d = X.shape if X.ndim > 1 else (X.size, 1)
+    X = X.reshape(N, d)
+
+    res = faiss.StandardGpuResources()
+
+    cpu_index = faiss.IndexFlatL2(d)  # ユークリッド距離
+    gpu_index = faiss.index_cpu_to_gpu(res, 0, cpu_index)
+    
+    # --- データをGPUインデックスに登録（NumPy経由でfloat32） ---
+    X_np = cp.asnumpy(X)  # CuPy→NumPy（FAISS GPU版はこれでOK）
+    gpu_index.add(X_np)
+
+    # --- k最近傍探索 ---
+    D, _ = gpu_index.search(X_np, k + 1)  # 自分自身を含む
+    D = D[:, 1:]  # 自分自身を除外
+    
+    eps = np.sqrt(D[:, -1])  # L2距
+    eps = np.where(eps <= 0, 1e-12, eps)
+
+    # --- 定数項（単位球体の体積係数）---
+    C_d = (np.pi ** (0.5 * d)) / gamma(1.0 + 0.5 * d)
+
+    # --- Kozachenko–Leonenko 推定式 ---
+    H = -psi(k) + psi(N) + np.log(C_d) + d * np.mean(np.log(eps))
+
+    # --- 結果をCPU側へ戻す ---
+    return float(H)
+
+
+N = 10000000
 s = 1.e0
 x = np.random.normal(0.e0, s, N)
 Ht = 0.5e0 * (1.e0 + np.log(2.e0 * np.pi * s**2))
@@ -116,17 +189,26 @@ Hn1 = shannon_entropy_py(x, k=3)
 t2 = time.time()
 Hn2 = shannon_entropy_rp(x, k=3)
 t3 = time.time()
-Hn3 = shannon_entropy_rp_cupy(x, k=3)
+#Hn3 = shannon_entropy_rp_cupy(x, k=3)
 t4 = time.time()
-Hc = shannon_entropy(x.reshape(-1,1), k=3)
+#Hn4 = shannon_entropy_rp_cupy_batch(x, k=3)
 t5 = time.time()
+#Hn5 = shannon_entropy_rp_cupy_faiss(x, k=3)
+t6 = time.time()
+Hc = shannon_entropy(x.reshape(-1,1), k=3)
+t7 = time.time()
 
-print("Theoretical:", Ht)
+print("Number     :", N  )
+print("Theoretical:", Ht )
 print("python     :", Hn1)
 print("python rp  :", Hn2)
-print("python rpc :", Hn3)
-print("c++        :", Hc)
+#print("python rpc :", Hn3)
+#print("python rpcb:", Hn4)
+#print("python rpcf:", Hn5)
+print("c++        :", Hc )
 print("time python            :", t2-t1)
 print("time python rapids     :", t3-t2)
-print("time python rapids cupy:", t4-t3)
-print("time c++:", t5-t4)
+print("time python rapids cp  :", t4-t3)
+print("time python rapids cp b:", t5-t4)
+print("time python rapids cp f:", t6-t5)
+print("time c++               :", t7-t6)
