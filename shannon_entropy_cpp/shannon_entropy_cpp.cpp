@@ -45,12 +45,12 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
   ssize_t cols_x = info_x.shape[1];
   int N = static_cast<int>(rows_x);
   int M = static_cast<int>(rows_y);
-  if (N != M) {
-    throw std::runtime_error("Input argument must be the same length");
-  }
+  //if (N != M) {
+  //  throw std::runtime_error("Input argument must be the same length");
+  //}
   int d = static_cast<int>(cols_x);
   
-  return KL_div(&x, &y, k, d, N);
+  return KL_div(&x, &y, k, d, N, M);
 }
 
 
