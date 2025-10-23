@@ -5,7 +5,8 @@ from scipy.spatial import KDTree
 import time
 import cupy as cp
 from cupyx.scipy.special import psi as psi_g, gamma as gamma_g
-import faiss
+#import faiss
+from cupy.cuda.nvtx import RangePush, RangePop
 from cuml.neighbors import NearestNeighbors
 
 
@@ -50,6 +51,8 @@ def shannon_entropy_py(X, k=3, Thei=1, Z=None):
     H = -psi_c(k) + psi_c(N) + np.log(Cdx) + dx * np.mean(np.log(eps))
   return H
 
+'''
+# nvtx
 def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
   # Kozachenko Leonenko
   X = cp.asarray(X, dtype=cp.float32)
@@ -57,15 +60,48 @@ def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
   N = X.shape[0]
   dx = X_gpu.shape[1]
 
-    # 最近傍探索 (L∞距離)
-  nn = NearestNeighbors(n_neighbors=k+1, algorithm='brute', metric='chebyshev')
-  nn.fit(X_gpu)
-  dist, _ = nn.kneighbors(X_gpu)
+  # 最近傍探索 (L∞距離)
+  with nvtx.annotate("NearestNeighbors", color="blue"):
+    nn = NearestNeighbors(n_neighbors=k+1, algorithm='brute', metric='chebyshev')
+
+  with nvtx.annotate("nn.kneighbors", color="red"):
+    nn.fit(X_gpu)
+    dist, _ = nn.kneighbors(X_gpu)
 
     # k+1番目の距離（自身を除外）
+  with nvtx.annotate("eps and Cdx", color="red"):
+    eps = 2.0 * dist[:, -1]
+    eps = cp.where(eps <= 0, 1e-12, eps)
+    Cdx = cp.pi**(0.5e0*dx) / gamma_g(1.e0 + 0.5e0 * dx) / 2.e0**dx 
+
+  with nvtx.annotate("digamma", color="green"):
+    H = -psi_g(k) + psi_g(N) + cp.log(Cdx) + dx * cp.mean(cp.log(eps))
+  return cp.asnumpy(H) # Convert back to numpy for return value
+'''
+
+def shannon_entropy_rp(X, k=3, Thei=1, Z=None):
+  # Kozachenko Leonenko
+  X = cp.asarray(X, dtype=cp.float32)
+  X_gpu = X.reshape(-1, 1)
+  N = X.shape[0]
+  dx = X_gpu.shape[1]
+
+  # 最近傍探索 (L∞距離)
+  RangePush("NearestNeighbors")
+  nn = NearestNeighbors(n_neighbors=k+1, algorithm='brute', metric='chebyshev')
+  RangePop()
+
+  RangePush("nn.kneighbors")
+  nn.fit(X_gpu)
+  dist, _ = nn.kneighbors(X_gpu)
+  RangePop()
+  
+  RangePush("eps and Cdx")
+  # k+1番目の距離（自身を除外）
   eps = 2.0 * dist[:, -1]
   eps = cp.where(eps <= 0, 1e-12, eps)
   Cdx = cp.pi**(0.5e0*dx) / gamma_g(1.e0 + 0.5e0 * dx) / 2.e0**dx 
+  RangePop()
 
   H = -psi_g(k) + psi_g(N) + cp.log(Cdx) + dx * cp.mean(cp.log(eps))
   return cp.asnumpy(H) # Convert back to numpy for return value
@@ -180,7 +216,7 @@ def shannon_entropy_rp_cupy_faiss(X, k=3):
     return float(H)
 
 
-N = 2000000
+N = 20000000
 s = 1.e0
 x = np.random.normal(0.e0, s, N)
 Ht = 0.5e0 * (1.e0 + np.log(2.e0 * np.pi * s**2))
@@ -191,9 +227,9 @@ t2 = time.time()
 Hn2 = shannon_entropy_rp(x, k=3)
 t3 = time.time()
 #Hn3 = shannon_entropy_rp_cupy(x, k=3)
-t4 = time.time()
+#t4 = time.time()
 #Hn4 = shannon_entropy_rp_cupy_batch(x, k=3)
-t5 = time.time()
+#t5 = time.time()
 #Hn5 = shannon_entropy_rp_cupy_faiss(x, k=3)
 t6 = time.time()
 Hc = shannon_entropy(x.reshape(-1,1), k=3)
@@ -209,7 +245,7 @@ print("python rp  :", Hn2)
 print("c++        :", Hc )
 print("time python            :", t2-t1)
 print("time python rapids     :", t3-t2)
-print("time python rapids cp  :", t4-t3)
-print("time python rapids cp b:", t5-t4)
-print("time python rapids cp f:", t6-t5)
+#print("time python rapids cp  :", t4-t3)
+#print("time python rapids cp b:", t5-t4)
+#print("time python rapids cp f:", t6-t5)
 print("time c++               :", t7-t6)
