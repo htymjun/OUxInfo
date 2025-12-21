@@ -1,4 +1,5 @@
 *.o
 *.so
-*.png
-*.dat
+tutorials/__pycache__
+ouxinfo.egg-info
+
