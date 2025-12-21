@@ -108,7 +108,37 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
       TEs += transfer_entropy(&xs_ptr, &y, k, dx, dy, N, tau);
       }
   }
+  TEs /= static_cast<double>(trial);
   return std::max(TE - TEs, 0.e0);}
+
+
+double information_flux_wrapper(py::array_t<double, py::array::c_style> x_obj, 
+                                py::array_t<double, py::array::c_style> y_obj,
+                                int k=5, int tau=1, double dt=1.e0){
+  py::buffer_info info_x = x_obj.request();
+  py::buffer_info info_y = y_obj.request();
+  if (info_x.ndim != 2 || info_y.ndim != 2) {
+    throw std::runtime_error("Input dimension must be 2");
+  }
+  if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
+    throw std::runtime_error("Expected float64");
+  }
+  double *x = static_cast<double*>(info_x.ptr);
+  double *y = static_cast<double*>(info_y.ptr);
+  int N = static_cast<int>(info_x.shape[0]);
+  int M = static_cast<int>(info_y.shape[0]);
+  if (N != M) {
+    throw std::runtime_error("Input argument must be the same length");
+  }
+  int dx = static_cast<int>(info_x.shape[1]);
+  int dy = static_cast<int>(info_y.shape[1]);
+  // shift data
+  int Neff = N - tau;
+  double *z = nullptr;
+  z = y + tau * dy;
+  double Ilag = mutual_info(&x, &z, k, dx, dy, Neff);
+  double I    = mutual_info(&x, &y, k, dx, dy, Neff);
+  return (Ilag - I) / dt;}
 
 
 // ============================================================
@@ -128,5 +158,8 @@ PYBIND11_MODULE(ouxinfo, m) {
   m.def("transfer_entropy", &transfer_entropy_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("tau")=1, py::arg("trial")=0,
         "Compute transfer entropy of dataset X and Y using Kraskov's estimator type 1");
+  m.def("information_flux", &information_flux_wrapper,
+        py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("tau")=1, py::arg("dt")=1.e0,
+        "Compute information flux of dataset X and Y using Kraskov's estimator type 1");
 }
 
