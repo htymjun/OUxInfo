@@ -53,7 +53,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   std::vector<size_t> ret_index(k+1);
   std::vector<T> out_dist(k+1);
   //T eps_all = 0; 
-  #pragma omp parallel for schedule(static)
+  //#pragma omp parallel for schedule(static)
   for (int i = 0; i < N; i++) {
     // --- XY spacekNN (Chebyshev) ---
     KNNResultSet<T> resultSet(k+1);
@@ -72,7 +72,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   }
   //std::cerr << "eps_mean_c++=" << eps_all / N << "\n";  // mutual information
   T digamma_sum = 0.e0;
-  #pragma omp parallel for reduction(+:digamma_sum)
+  //#pragma omp parallel for reduction(+:digamma_sum)
   for (int i = 0; i < N; i++) {
     digamma_sum += - digamma(nX[i] + 1.e0) - digamma(nY[i] + 1.e0);
     }

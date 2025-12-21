@@ -22,7 +22,7 @@ X = loaddata['X']
 
 Nv, Nt = X.shape
 
-tau = 3
+tau = int(0.046e0 / 165.e0 * Nt) # tau = 0.046Te, Lt = 165Te
 TE  = np.zeros((Nv,Nv))
 IF  = np.zeros((Nv,Nv))
 for j in tqdm(range(Nv)):
