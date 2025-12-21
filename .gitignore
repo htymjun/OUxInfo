@@ -1,4 +1,5 @@
 *.o
 *.so
 tutorials/__pycache__
+ouxinfo.egg-info
 

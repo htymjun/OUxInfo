@@ -29,7 +29,6 @@ ext_modules = [
 setup(
   name="ouxinfo",
   version="0.1.0",
-  author="Jun Hatayama & Yuto Ota",
   description="Fast Shannon entropy estimator using C++",
   ext_modules=ext_modules,
   cmdclass={"build_ext": CustomBuildExt},
