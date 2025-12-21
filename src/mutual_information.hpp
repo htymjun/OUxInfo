@@ -26,7 +26,7 @@ using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
 // mutual information
 // ============================================================
 template<typename T>
-T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei = 10) {
+T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   if (N == 0) return 0.e0;
   T *X = *X_ptr;
   T *Y = *Y_ptr;
