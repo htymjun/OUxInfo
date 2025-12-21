@@ -7,11 +7,12 @@ OUxInfo is a C++ based fast Shannon entropy estimator for Python.
 
 ## Setup
 1. Install Boost
-'''
+~~~bash
 $ sudo apt install libboost-dev
-'''
+~~~
+
 2. Compile OUxInfo
-'''
+~~~bash
 $ pip install .
-'''
+~~~
 
