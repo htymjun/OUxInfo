@@ -67,7 +67,8 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  return mutual_info(&x, &y, k, dx, dy, N);}
+  return mutual_info(&x, &y, k, dx, dy, N);
+}
 
 
 double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, 
@@ -109,7 +110,8 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
       }
   }
   TEs /= static_cast<double>(trial);
-  return std::max(TE - TEs, 0.e0);}
+  return std::max(TE - TEs, 0.e0);
+}
 
 
 double information_flux_wrapper(py::array_t<double, py::array::c_style> x_obj, 
@@ -138,7 +140,8 @@ double information_flux_wrapper(py::array_t<double, py::array::c_style> x_obj,
   z = y + tau * dy;
   double Ilag = mutual_info(&x, &z, k, dx, dy, Neff);
   double I    = mutual_info(&x, &y, k, dx, dy, Neff);
-  return (Ilag - I) / dt;}
+  return (Ilag - I) / dt;
+}
 
 
 // ============================================================
