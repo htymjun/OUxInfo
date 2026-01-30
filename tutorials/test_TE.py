@@ -5,6 +5,13 @@ import matplotlib.pyplot as plt
 from ouxinfo import transfer_entropy
 
 
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['mathtext.fontset'] = 'stix'
+plt.rcParams['xtick.direction'] = 'in'
+plt.rcParams['ytick.direction'] = 'in'
+plt.rcParams['font.size'] = 20
+
+
 @njit(cache=True, nogil=True)
 def coupling_system(nt, x0, y0, bxy, byx, gx=3.7e0, gy=3.72e0):
   x = np.zeros(nt+1)
@@ -29,11 +36,11 @@ def test_coupling_system(nt, n, byx, x0, y0, trial):
     TExy[j] /= trial
     TEyx[j] /= trial
   plt.figure(figsize=(6,6))
-  plt.plot(bxy, TExy, color='blue',  linestyle='solid')
-  plt.plot(bxy, TEyx, color='blue',  linestyle='dashed')
-  plt.xlabel(r'$\beta_{xy}$', fontsize=18, style='italic')
-  plt.ylabel("Causality", fontsize=18)
-  plt.ylim([-0.1, 0.6])
+  plt.plot(bxy, TExy, color='blue', linestyle='solid')
+  plt.plot(bxy, TEyx, color='red',  linestyle='solid')
+  plt.xlabel(r'$\beta_{xy}$', fontsize=20, style='italic')
+  plt.ylabel("TE", fontsize=20)
+  plt.ylim([-0.05, 0.45])
   plt.show()
 
 
