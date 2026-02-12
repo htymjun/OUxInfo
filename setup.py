@@ -32,7 +32,7 @@ if boost_include is None:
 
 class CustomBuildExt(build_ext):
   def build_extensions(self):
-    opts = ["-Ofast", "-std=c++14", "-fPIC"]
+    opts = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]
     for ext in self.extensions:
       ext.extra_compile_args = opts
     super().build_extensions()
@@ -44,7 +44,7 @@ ext_modules = [
     ["src/ouxinfo.cpp"],
     include_dirs=["src"],
     cxx_std=14,
-    extra_compile_args=["-Ofast"]
+    extra_compile_args=["-Ofast", "-fopenmp"]
   ),
 ]
 
