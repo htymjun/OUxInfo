@@ -6,6 +6,7 @@
 #include "mutual_information.hpp"
 #include "transfer_entropy.hpp"
 #include <vector>
+#include <omp.h>
 
 
 namespace py = pybind11;
@@ -144,6 +145,73 @@ double information_flux_wrapper(py::array_t<double, py::array::c_style> x_obj,
 }
 
 
+py::array_t<double> transfer_entropy_causal_map_wrapper(
+  py::array_t<double, py::array::c_style> X_obj,
+  py::array_t<int,    py::array::c_style> tau_obj,
+  int k=5, int trial=0, int n_threads=1){
+  py::buffer_info info     = X_obj.request();
+  py::buffer_info info_tau = tau_obj.request();
+  // error messages
+  if (info.ndim != 2)
+    throw std::runtime_error("X must be 2D (N, Nt)");
+  if (info_tau.ndim != 1)
+    throw std::runtime_error("tau must be 1D (N)");
+  if (info.itemsize != sizeof(double))
+    throw std::runtime_error("X must be float64");
+  if (info_tau.itemsize != sizeof(int))
+    throw std::runtime_error("tau must be int32");
+  // main
+  int N  = static_cast<int>(info.shape[0]);
+  int Nt = static_cast<int>(info.shape[1]);
+  if (info_tau.shape[0] != N)
+    throw std::runtime_error("tau length must equal N");
+  // pointer
+  double *X = static_cast<double*>(info.ptr);
+  int *tau_arr = static_cast<int*>(info_tau.ptr);
+  py::array_t<double> TE_map({N,N});
+  py::buffer_info info_out = TE_map.request();
+  double *TE = static_cast<double*>(info_out.ptr);
+  // main loop
+  omp_set_num_threads(n_threads);
+  #pragma omp parallel
+  {
+    std::mt19937 rng(omp_get_thread_num() + 1234);
+    std::vector<int> idx(Nt);
+    std::vector<double> xs_data(Nt);
+    std::iota(idx.begin(), idx.end(), 0);
+    #pragma omp for collapse(1) schedule(dynamic)
+    for (int j = 0; j < N; j++) {
+      for (int i = 0; i < N; i++) {
+        if (i == j) {
+          TE[j*N + i] = std::numeric_limits<double>::quiet_NaN();
+          continue;
+        }
+        int tau = tau_arr[i];
+        double *xi = X + i * Nt;
+        double *xj = X + j * Nt;
+        double TE_val = transfer_entropy(&xi, &xj, k, 1, 1, Nt, tau);
+        double TEs = 0.0;
+        if (trial > 0) {
+          std::vector<int> idx(Nt);
+          std::iota(idx.begin(), idx.end(), 0);
+          for (int itr = 0; itr < trial; ++itr) {
+            std::shuffle(idx.begin(), idx.end(), rng);
+            std::vector<double> xs_data(Nt);
+            for (int t = 0; t < Nt; ++t)
+              xs_data[t] = xi[idx[t]];
+            double *xs_ptr = xs_data.data();
+            TEs += transfer_entropy(&xs_ptr, &xj, k, 1, 1, Nt, tau);
+          }
+          TEs /= static_cast<double>(trial);
+        }
+        TE[j*N + i] = std::max(TE_val - TEs, 0.0);
+      }
+    }
+  }
+  return TE_map;
+}
+
+
 // ============================================================
 // pybind11 module
 // ============================================================
@@ -164,5 +232,8 @@ PYBIND11_MODULE(ouxinfo, m) {
   m.def("information_flux", &information_flux_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("tau")=1, py::arg("dt")=1.e0,
         "Compute information flux of dataset X and Y using Kraskov's estimator type 1");
+  m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
+        py::arg("X"), py::arg("tau"), py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
+        "Compute causal map based on transfer entropy");
 }
 
