@@ -181,6 +181,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
     std::iota(idx.begin(), idx.end(), 0);
     #pragma omp for collapse(1) schedule(dynamic)
     for (int j = 0; j < N; j++) {
+      double *xj = X + j * Nt;
       for (int i = 0; i < N; i++) {
         if (i == j) {
           TE[j*N + i] = std::numeric_limits<double>::quiet_NaN();
@@ -188,7 +189,6 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
         }
         int tau = tau_arr[i];
         double *xi = X + i * Nt;
-        double *xj = X + j * Nt;
         double TE_val = transfer_entropy(&xi, &xj, k, 1, 1, Nt, tau);
         double TEs = 0.0;
         if (trial > 0) {
