@@ -44,7 +44,8 @@ ext_modules = [
     ["src/ouxinfo.cpp"],
     include_dirs=["src"],
     cxx_std=14,
-    extra_compile_args=["-Ofast", "-fopenmp"]
+    extra_compile_args=["-Ofast", "-fopenmp"],
+    extra_link_args=["-fopenmp"],
   ),
 ]
 
