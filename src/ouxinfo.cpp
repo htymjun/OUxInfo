@@ -50,7 +50,7 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
 
 
 double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj, 
-                           py::array_t<double, py::array::c_style> y_obj, int k=5){
+                           py::array_t<double, py::array::c_style> y_obj, int k=5, int Thei=0){
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -68,7 +68,14 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  return mutual_info(&x, &y, k, dx, dy, N);
+  double I;
+  if (Thei == 0) {
+    I = mutual_info(&x, &y, k, dx, dy, N);
+  }
+  else { 
+    I = mutual_info_Thei(&x, &y, k, dx, dy, N, Thei);
+  }
+  return I;
 }
 
 
@@ -179,7 +186,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
     std::vector<int> idx(Nt);
     std::vector<double> xs_data(Nt);
     std::iota(idx.begin(), idx.end(), 0);
-    #pragma omp for collapse(1) schedule(dynamic)
+    #pragma omp for schedule(dynamic)
     for (int j = 0; j < N; j++) {
       double *xj = X + j * Nt;
       for (int i = 0; i < N; i++) {
@@ -212,6 +219,60 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
 }
 
 
+py::array_t<double> information_flux_causal_map_wrapper(
+  py::array_t<double, py::array::c_style> X_obj,
+  py::array_t<int,    py::array::c_style> tau_obj,
+  double dt=1.e0, int k=5, int n_threads=1){
+  py::buffer_info info     = X_obj.request();
+  py::buffer_info info_tau = tau_obj.request();
+  // error messages
+  if (info.ndim != 2)
+    throw std::runtime_error("X must be 2D (N, Nt)");
+  if (info_tau.ndim != 1)
+    throw std::runtime_error("tau must be 1D (N)");
+  if (info.itemsize != sizeof(double))
+    throw std::runtime_error("X must be float64");
+  if (info_tau.itemsize != sizeof(int))
+    throw std::runtime_error("tau must be int32");
+  // main
+  int N  = static_cast<int>(info.shape[0]);
+  int Nt = static_cast<int>(info.shape[1]);
+  if (info_tau.shape[0] != N)
+    throw std::runtime_error("tau length must equal N");
+  // pointer
+  double *X = static_cast<double*>(info.ptr);
+  int *tau_arr = static_cast<int*>(info_tau.ptr);
+  py::array_t<double> IF_map({N,N});
+  py::buffer_info info_out = IF_map.request();
+  double *IF = static_cast<double*>(info_out.ptr);
+  // main loop
+  omp_set_num_threads(n_threads);
+  #pragma omp parallel
+  {
+    #pragma omp for schedule(dynamic)
+    for (int j = 0; j < N; j++) {
+      double *xj = X + j * Nt;
+      for (int i = 0; i < N; i++) {
+        if (i == j) {
+          IF[j*N + i] = std::numeric_limits<double>::quiet_NaN();
+          continue;
+        }
+        int tau = tau_arr[i];
+        double *xi = X + i * Nt;
+        /// shift
+        int Neff = Nt - tau;
+        double *z  = nullptr;
+        z = xj + tau;
+        double Ilag = mutual_info(&xi, &z,  k, 1, 1, Neff);
+        double I    = mutual_info(&xi, &xj, k, 1, 1, Neff);
+        IF[j*N + i] = (Ilag - I) / dt;
+      }
+    }
+  }
+  return IF_map;
+}
+
+
 // ============================================================
 // pybind11 module
 // ============================================================
@@ -224,7 +285,7 @@ PYBIND11_MODULE(ouxinfo, m) {
         py::arg("X"), py::arg("Y"), py::arg("k")=5,
         "Compute Kullback-Leibler divergence of dataset X and Y using Pérez-Cruz");
   m.def("mutual_info", &mutual_info_wrapper,
-        py::arg("X"), py::arg("Y"), py::arg("k")=5,
+        py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("Thei")=0,
         "Compute mutual information of dataset X and Y using Kraskov's estimator type 1");
   m.def("transfer_entropy", &transfer_entropy_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("tau")=1, py::arg("trial")=0,
@@ -235,5 +296,8 @@ PYBIND11_MODULE(ouxinfo, m) {
   m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
         py::arg("X"), py::arg("tau"), py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
         "Compute causal map based on transfer entropy");
+  m.def("information_flux_causal_map", &information_flux_causal_map_wrapper,
+        py::arg("X"), py::arg("tau"), py::arg("dt")=1.e0, py::arg("k")=5, py::arg("n_threads")=1,
+        "Compute causal map based on information flux");
 }
 
