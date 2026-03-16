@@ -31,9 +31,10 @@ def test_coupling_system(nt, n, byx, x0, y0, trial):
   plt.figure(figsize=(6,6))
   plt.plot(bxy, IFxy, color='blue',  linestyle='solid')
   plt.plot(bxy, IFyx, color='blue',  linestyle='dashed')
+  plt.plot(bxy, np.zeros_like(IFxy), color='black', linestyle='dashed')
   plt.xlabel(r'$\beta_{xy}$', fontsize=18, style='italic')
   plt.ylabel("Causality", fontsize=18)
-  plt.ylim([-0.1, 0.6])
+  plt.ylim([-0.1, 0.2])
   plt.show()
 
 
