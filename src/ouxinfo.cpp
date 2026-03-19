@@ -226,8 +226,8 @@ py::array_t<double> information_flux_causal_map_wrapper(
   py::buffer_info info     = X_obj.request();
   py::buffer_info info_tau = tau_obj.request();
   // error messages
-  if (info.ndim != 2)
-    throw std::runtime_error("X must be 2D (N, Nt)");
+  if (info.ndim != 2 && info.ndim != 3)
+    throw std::runtime_error("X must be 2D (N, Nt) or 3D (N, Nt, dx)");
   if (info_tau.ndim != 1)
     throw std::runtime_error("tau must be 1D (N)");
   if (info.itemsize != sizeof(double))
@@ -237,6 +237,7 @@ py::array_t<double> information_flux_causal_map_wrapper(
   // main
   int N  = static_cast<int>(info.shape[0]);
   int Nt = static_cast<int>(info.shape[1]);
+  int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
     throw std::runtime_error("tau length must equal N");
   // pointer
@@ -251,20 +252,20 @@ py::array_t<double> information_flux_causal_map_wrapper(
   {
     #pragma omp for schedule(dynamic)
     for (int j = 0; j < N; j++) {
-      double *xj = X + j * Nt;
+      double *xj = X + j * Nt * dx;
       for (int i = 0; i < N; i++) {
-        if (i == j) {
-          IF[j*N + i] = std::numeric_limits<double>::quiet_NaN();
-          continue;
-        }
+        //if (i == j) {
+        //  IF[j*N + i] = std::numeric_limits<double>::quiet_NaN();
+        //  continue;
+        //}
         int tau = tau_arr[i];
-        double *xi = X + i * Nt;
+        double *xi = X + i * Nt * dx;
         /// shift
         int Neff = Nt - tau;
         double *z  = nullptr;
-        z = xj + tau;
-        double Ilag = mutual_info(&xi, &z,  k, 1, 1, Neff);
-        double I    = mutual_info(&xi, &xj, k, 1, 1, Neff);
+        z = xj + tau * dx;
+        double Ilag = mutual_info(&xi, &z,  k, dx, dx, Neff);
+        double I    = mutual_info(&xi, &xj, k, dx, dx, Neff);
         IF[j*N + i] = (Ilag - I) / dt;
       }
     }
