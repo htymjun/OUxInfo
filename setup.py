@@ -32,11 +32,10 @@ if boost_include is None:
 
 class CustomBuildExt(build_ext):
   def build_extensions(self):
-    opts = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]
+    opts = ["-Ofast", "-march=native", "-mfma", "-fopenmp", "-std=c++14", "-fPIC"]
     for ext in self.extensions:
       ext.extra_compile_args = opts
     super().build_extensions()
-
 
 ext_modules = [
   Pybind11Extension(
