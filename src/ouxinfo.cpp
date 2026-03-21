@@ -1,12 +1,15 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include <vector>
+#include <random>
+#include <numeric>
+#include <algorithm>
+#include <stdexcept>
+#include <omp.h>
 #include "shannon_entropy.hpp"
 #include "kullback_leibler_divergence.hpp"
 #include "mutual_information.hpp"
-#include "transfer_entropy.hpp"
-#include <vector>
-#include <omp.h>
 
 
 namespace py = pybind11;
@@ -108,7 +111,7 @@ double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x
 
 double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                                 py::array_t<double, py::array::c_style> y_obj,
-                                int tau=1, double dt=1.e0, int k=5, int trial=0){
+                                int tau=1, int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0){
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -126,28 +129,48 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  int Nt = N - tau;
-  double *z = nullptr;
-  z = y + tau * dy;
-  double TE  = conditional_mutual_info(&x, &z, &y, k, dx, dy, dy, Nt); // I(X^n;Y^{n+tau}|Y^n)
+  int i_start = (m - 1) * lag;
+  int Nt = N - tau - i_start;
+  if (Nt <= 0) {
+    throw std::runtime_error("Not enough data points for the given tau, m, and lag.");
+  }
+  // Y history
+  int dy_past = m * dy;
+  std::vector<double> y_past_data(Nt * dy_past);
+  double *y_past = y_past_data.data();
+  for (int i = 0; i < Nt; ++i) {
+    int current_time = i_start + i;
+    for (int j = 0; j < m; ++j) {
+      int past_time = current_time - j * lag;
+      std::copy(y + past_time * dy,
+                y + past_time * dy + dy,
+                y_past + i * dy_past + j * dy);
+    }
+  }
+  // offset x & z
+  double *x_valid = x + i_start * dx;
+  double *z_valid = y + (i_start + tau) * dy;
+  double TE  = conditional_mutual_info(&x_valid, &z_valid, &y_past, k, dx, dy, dy_past, Nt); // I(X^n;Y^{n+tau}|Y^n)
   double TEs = 0.e0;
   if (trial > 0) {
-    std::vector<int> idx(N);
+    std::vector<int> idx(Nt);
     std::iota(idx.begin(), idx.end(), 0);
     std::random_device rd;
     std::mt19937 g(rd());
+    std::vector<double> xs_data(Nt * dx);
     for (int itr = 0; itr < trial; itr++) {
       std::shuffle(idx.begin(), idx.end(), g);
-      std::vector<double> xs_data(N * dx);
-      for (int i = 0; i < N; ++i) {
+      for (int i = 0; i < Nt; ++i) {
         int original_idx = idx[i];
-        std::copy(x + (original_idx * dx), x + (original_idx * dx) + dx, xs_data.begin() + (i * dx));
+        std::copy(x_valid + (original_idx * dx),
+                  x_valid + (original_idx * dx) + dx,
+                  xs_data.begin() + (i * dx));
       }
       double *xs_ptr = xs_data.data();
-      TEs += conditional_mutual_info(&xs_ptr, &z, &y, k, dx, dy, dy, Nt); // I(Xs^n:Y^{n+tau}|Y^n)
-      }
+      TEs += conditional_mutual_info(&xs_ptr, &z_valid, &y_past, k, dx, dy, dy_past, Nt); // I(Xs^n:Y^{n+tau}|Y^n)
+    }
+    TEs /= static_cast<double>(trial);
   }
-  TEs /= static_cast<double>(trial);
   return std::max(TE - TEs, 0.e0);
 }
 
@@ -185,7 +208,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
 py::array_t<double> transfer_entropy_causal_map_wrapper(
   py::array_t<double, py::array::c_style> X_obj,
   py::array_t<int,    py::array::c_style> tau_obj,
-  double dt=1.e0, int k=5, int trial=0, int n_threads=1){
+  int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0, int n_threads=1){
   py::buffer_info info     = X_obj.request();
   py::buffer_info info_tau = tau_obj.request();
   // error messages
@@ -209,14 +232,17 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   py::array_t<double> TE_map({N,N});
   py::buffer_info info_out = TE_map.request();
   double *TE = static_cast<double*>(info_out.ptr);
+  // History
+  int dx_past = m * dx;
+  int i_start = (m-1) * lag;
   // main loop
   omp_set_num_threads(n_threads);
   #pragma omp parallel
   {
     std::mt19937 rng(omp_get_thread_num() + 1234);
+    std::vector<double> xj_past_data(Nt * dx_past);
+    std::vector<double> xs_data(Nt * dx);
     std::vector<int> idx(Nt);
-    std::vector<double> xs_data(Nt);
-    std::iota(idx.begin(), idx.end(), 0);
     #pragma omp for schedule(dynamic)
     for (int j = 0; j < N; j++) {
       double *xj = X + j * Nt * dx;
@@ -226,24 +252,42 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
           continue;
         }
         int tau = tau_arr[i];
+        int Neff = Nt - tau - i_start;
+        if (Neff <= 0) {
+          TE[j*N+i] = std::numeric_limits<double>::quiet_NaN();
+          continue;
+        }
+        // Target History
+        double *xj_past = xj_past_data.data();
+        for (int n = 0; n < Neff; ++n) {
+          int current_time = i_start + n;
+          for (int m_idx = 0; m_idx < m; ++m_idx) {
+            int past_time = current_time - m_idx * lag;
+            std::copy(xj + past_time * dx,
+                      xj + past_time * dx + dx,
+                      xj_past + n * dx_past + m_idx * dx);
+          }
+        }
+        // offset
         double *xi = X + i * Nt * dx;
-        int Neff = Nt - tau;
-        double *z = nullptr;
-        z = xj + tau * dx;
-        double TE_val = conditional_mutual_info(&xi, &z, &xj, k, dx, dx, dx, Neff); // I(X^n;Y^{n+tau}|Y^n)
+        double *xi_valid = xi + i_start * dx;
+        double *z_valid  = xj + (i_start + tau) * dx;
+        // I(X^n;Y^{n+tau}|Y^past)
+        double TE_val = conditional_mutual_info(&xi_valid, &z_valid, &xj_past, k, dx, dx, dx_past, Neff);
         double TEs = 0.0;
         if (trial > 0) {
-          std::vector<int> idx(Nt);
-          std::iota(idx.begin(), idx.end(), 0);
+          std::iota(idx.begin(), idx.begin() + Neff, 0);
           for (int itr = 0; itr < trial; ++itr) {
-            std::shuffle(idx.begin(), idx.end(), rng);
-            std::vector<double> xs_data(Nt * dx);
-            for (int t = 0; t < Nt; ++t) {
+            std::shuffle(idx.begin(), idx.begin() + Neff, rng);
+            for (int t = 0; t < Neff; ++t) {
               int original_idx = idx[t];
-              std::copy(xi + (original_idx * dx), xi + (original_idx * dx) + dx, xs_data.begin() + (t * dx));
+              std::copy(xi_valid + (original_idx * dx),
+                        xi_valid + (original_idx * dx) + dx,
+                        xs_data.begin() + (t * dx));
             }
             double *xs_ptr = xs_data.data();
-            TEs += conditional_mutual_info(&xs_ptr, &z, &xj, k, dx, dx, dx, Neff); // I(X^n;Y^{n+tau}|Y^n)
+            // I(X^n;Y^{n+tau}|Y^past)
+            TEs += conditional_mutual_info(&xs_ptr, &z_valid, &xj_past, k, dx, dx, dx_past, Neff);
           }
           TEs /= static_cast<double>(trial);
         }
@@ -328,13 +372,15 @@ PYBIND11_MODULE(ouxinfo, m) {
         py::arg("X"), py::arg("Y"), py::arg("Z"), py::arg("k")=5,
         "Compute conditional mutual information of dataset X, Y, and Z using Kraskov's estimator type 1");
   m.def("transfer_entropy", &transfer_entropy_wrapper,
-        py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0,
+        py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("m")=1, py::arg("lag")=1,
+        py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0,
         "Compute transfer entropy of dataset X and Y using Kraskov's estimator type 1");
   m.def("information_flow", &information_flow_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("dt")=1.e0, py::arg("k")=5,
         "Compute information flow of dataset X and Y using Kraskov's estimator type 1");
   m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
-        py::arg("X"), py::arg("tau"), py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
+        py::arg("X"), py::arg("tau"), py::arg("m")=1, py::arg("lag")=1,
+        py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
         "Compute causal map based on transfer entropy");
   m.def("information_flow_causal_map", &information_flow_causal_map_wrapper,
         py::arg("X"), py::arg("tau"), py::arg("dt")=1.e0, py::arg("k")=5, py::arg("n_threads")=1,
