@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from ouxinfo import transfer_entropy
+from ouxinfo import transfer_entropy, backward_transfer_entropy
 
 
 plt.rcParams['font.family'] = 'Times New Roman'
@@ -26,21 +26,30 @@ def coupling_system(nt, x0, y0, bxy, byx, gx=3.7e0, gy=3.72e0):
 
 def test_coupling_system(nt, n, byx, x0, y0, trial):
   bxy = np.linspace(0.e0, 0.3e0, n)
-  TExy = np.zeros(n)
-  TEyx = np.zeros(n)
+  TExy  = np.zeros(n)
+  TEyx  = np.zeros(n)
+  BTExy = np.zeros(n)
+  BTEyx = np.zeros(n)
   for j in tqdm(range(n)):
     for i in range(trial):
       x, y = coupling_system(nt, x0, y0, bxy[j], byx)
-      TExy[j] += transfer_entropy(x.reshape(-1,1), y.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=1)
-      TEyx[j] += transfer_entropy(y.reshape(-1,1), x.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=1)
-    TExy[j] /= trial
-    TEyx[j] /= trial
+      TExy[j] += transfer_entropy(x.reshape(-1,1), y.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=0)
+      TEyx[j] += transfer_entropy(y.reshape(-1,1), x.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=0)
+      BTExy[j] += backward_transfer_entropy(x.reshape(-1,1), y.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=0)
+      BTEyx[j] += backward_transfer_entropy(y.reshape(-1,1), x.reshape(-1,1), k=5, tau=1, m=1, lag=1, trial=0)
+    TExy[j]  /= trial
+    TEyx[j]  /= trial
+    BTExy[j] /= trial
+    BTEyx[j] /= trial
   plt.figure(figsize=(6,6))
-  plt.plot(bxy, TExy, color='blue', linestyle='solid')
-  plt.plot(bxy, TEyx, color='red',  linestyle='solid')
+  plt.plot(bxy, TExy,  color='blue', linestyle='solid',  label=r'$TE_{x \to y}$')
+  plt.plot(bxy, TEyx,  color='red',  linestyle='solid',  label=r'$TE_{y \to x}$')
+  plt.plot(bxy, BTExy, color='blue', linestyle='dashed', label=r'$BTE_{x \to y}$')
+  plt.plot(bxy, BTEyx, color='red',  linestyle='dashed', label=r'$BTE_{y \to x}$')
   plt.xlabel(r'$\beta_{xy}$', fontsize=20, style='italic')
   plt.ylabel("TE", fontsize=20)
-  plt.ylim([-0.05, 0.35])
+  plt.ylim([-0.05, 0.4])
+  plt.legend(frameon=False)
   plt.show()
 
 

@@ -39,11 +39,11 @@ class CustomBuildExt(build_ext):
 
 ext_modules = [
   Pybind11Extension(
-    "ouxinfo",
-    ["src/ouxinfo.cpp"],
-    include_dirs=["src"],
+    "ouxinfo._core",
+    ["ouxinfo/ouxinfo.cpp"],
+    include_dirs=["ouxinfo"],
     cxx_std=14,
-    extra_compile_args=["-Ofast", "-fopenmp"],
+    extra_compile_args=["-Ofast", "-march=native", "-mfma", "-fopenmp"],
     extra_link_args=["-fopenmp"],
   ),
 ]
@@ -52,6 +52,7 @@ ext_modules = [
 setup(
   name="ouxinfo",
   version="0.1.0",
+  packages=["ouxinfo"],
   description="Fast Shannon entropy estimator using C++",
   ext_modules=ext_modules,
   cmdclass={"build_ext": CustomBuildExt},
@@ -59,6 +60,10 @@ setup(
   python_requires=">=3.12",
   install_requires=[
     'pybind11',
+    'numpy',
+    'matplotlib',
+    'scipy',
+    'numba',
   ],
 )
 
