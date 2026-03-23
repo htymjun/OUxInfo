@@ -1,8 +1,0 @@
-*.d
-*.mod
-*.o
-*.out
-*.png
-*.so
-python_test/__pycache__
-
