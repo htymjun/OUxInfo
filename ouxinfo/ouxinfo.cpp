@@ -16,6 +16,17 @@ namespace py = pybind11;
 
 
 double shannon_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, int k=5){
+  /*
+  Parameters
+  ----------
+  x : ndarray (N, dim)
+  k : int, optional
+      Number of nearest neighbors.
+  Returns
+  -------
+  double
+    Shannon entropy.
+  */
   py::buffer_info info = x_obj.request();
   if (info.ndim != 2) {
     throw std::runtime_error("Input dimension must be 2");
@@ -32,6 +43,18 @@ double shannon_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, in
 
 double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                       py::array_t<double, py::array::c_style> y_obj, int k=5){
+  /*
+  Parameters
+  ----------
+  x : ndarray (N, dim)
+  y : ndarray (N, dim)
+  k : int, optional
+      Number of nearest neighbors.
+  Returns
+  -------
+  double
+    KL divergence.
+  */
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -51,6 +74,20 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
 
 double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                            py::array_t<double, py::array::c_style> y_obj, int k=5, int Thei=0){
+  /*
+  Parameters
+  ----------
+  x    : ndarray (N, dim)
+  y    : ndarray (N, dim)
+  k    : int, optional
+         Number of nearest neighbors.
+  Thei : int, optional
+         Length of Theiler window.
+  Returns
+  -------
+  double
+    mutual information.
+  */
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -82,6 +119,19 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
 double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
                                        py::array_t<double, py::array::c_style> y_obj,
                                        py::array_t<double, py::array::c_style> z_obj, int k=5){
+  /*
+  Parameters
+  ----------
+  x : ndarray (N, dim)
+  y : ndarray (N, dim)
+  z : ndarray (N, dim)
+  k : int, optional
+      Number of nearest neighbors.
+  Returns
+  -------
+  double
+    conditional mutual information.
+  */
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   py::buffer_info info_z = z_obj.request();
@@ -112,6 +162,28 @@ double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x
 double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                                 py::array_t<double, py::array::c_style> y_obj,
                                 int tau=1, int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0){
+  /*
+  Parameters
+  ----------
+  x     : ndarray (N, dim)
+  y     : ndarray (N, dim)
+  tau   : int, optional
+          Length of time delay
+  m     : int, optional
+          Embedding dimension for y
+  lag   : int, optional
+          Time lag for embedding
+  dt    : double, optional
+          Physical time
+  k     : int, optional
+          Number of nearest neighbors.
+  trial : int, optional
+          The number of trials for surrogate analysis.
+  Returns
+  -------
+  double
+    transfer entropy.
+  */
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -178,6 +250,22 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
 double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                                 py::array_t<double, py::array::c_style> y_obj,
                                 int tau=1, double dt=1.e0, int k=5){
+  /*
+  Parameters
+  ----------
+  x   : ndarray (N, dim)
+  y   : ndarray (N, dim)
+  tau : int, optional
+        Length of time delay
+  dt  : double, optional
+        Physical time
+  k   : int, optional
+        Number of nearest neighbors.
+  Returns
+  -------
+  double
+    information flow.
+  */
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -209,6 +297,29 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   py::array_t<double, py::array::c_style> X_obj,
   py::array_t<int,    py::array::c_style> tau_obj,
   int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0, int n_threads=1){
+  /*
+  Parameters
+  ----------
+  X         : ndarray (N, Nt) or (N, Nt, dim)
+  tau       : ndarray (N)
+              Length of time delay
+  m         : int, optional
+              Embedding dimension for y
+  lag       : int, optional
+              Time lag for embedding
+  dt        : double, optional
+              Physical time
+  k         : int, optional
+              Number of nearest neighbors.
+  trial     : int, optional
+              The number of trials for surrogate analysis.
+  n_threads : int, optional
+              The number of threads used for OpenMP.
+  Returns
+  -------
+  double
+    transfer entropy causal map.
+  */
   py::buffer_info info     = X_obj.request();
   py::buffer_info info_tau = tau_obj.request();
   // error messages
@@ -303,6 +414,23 @@ py::array_t<double> information_flow_causal_map_wrapper(
   py::array_t<double, py::array::c_style> X_obj,
   py::array_t<int,    py::array::c_style> tau_obj,
   double dt=1.e0, int k=5, int n_threads=1){
+  /*
+  Parameters
+  ----------
+  X         : ndarray (N, Nt) or (N, Nt, dim)
+  tau       : ndarray (N)
+              Length of time delay
+  dt        : double, optional
+              Physical time
+  k         : int, optional
+              Number of nearest neighbors.
+  n_threads : int, optional
+              The number of threads used for OpenMP.
+  Returns
+  -------
+  double
+    information flow causal map.
+  */
   py::buffer_info info     = X_obj.request();
   py::buffer_info info_tau = tau_obj.request();
   // error messages
