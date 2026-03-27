@@ -8,6 +8,31 @@ from .backwardTE import backward_transfer_entropy
 
 
 def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, result_dir='.'):
+  '''
+  Parameters
+  ----------
+  X          : ndarray (N, dim)
+  tau        : int, optional
+               Length of time delay
+  dt         : double, optional
+               Physical time
+  lag        : int, optional
+               Time lag for embedding
+  max_m      : int, optional
+               Maximum embedding dimension
+  tol        : int, optional
+               Tolerance for mTE calculation
+  k          : int, optional
+               Number of nearest neighbors.
+  n_threads  : int, optional
+               The number of trials for surrogate analysis.
+  result_dir : str, optional
+               The path of directory to save result.
+  Returns
+  -------
+  numpy binary
+    Saves results to a compressed file in result_dir.
+  '''
   # Transfer Entropy, Information Flow, Leak
   # sTE > mTE > IF
   # error check
@@ -66,6 +91,18 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
 
 
 def plot_TEIFL(file_path, labels):
+  '''
+  Parameters
+  ----------
+  file_path : str
+              The path of directory to load result.
+  labels    : str
+              The labels for plot causal maps.
+  Returns
+  -------
+  numpy binary
+    Saves results in result_dir.
+  '''
   result_dir = os.path.dirname(file_path)
   teifl = np.load(file_path)
   sTE  = teifl['sTE']
