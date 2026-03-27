@@ -4,8 +4,8 @@ import time
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from tqdm import tqdm
-from ouxinfo import transfer_entropy, transfer_entropy_causal_map
-from ouxinfo import information_flux, information_flux_causal_map
+from ouxinfo import transfer_entropy_causal_map
+from ouxinfo import information_flow_causal_map
 from shannon import embedding_entropy_surrogate as embedding_entropy
 
 
@@ -30,7 +30,7 @@ tau = int(0.046e0 / 165.e0 * Nt) # tau = 0.046Te, Lt = 165Te
 taus = np.zeros(Nv, dtype=np.int32)
 taus[:] = tau
 
-TE = transfer_entropy_causal_map(X, taus, k=5)
+TE = transfer_entropy_causal_map(X, taus, m=3, lag=1, k=5)
 
 plt.imshow(TE, cmap=cm, extent=None, origin='lower')
 plt.xticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'$\Pi_{4}$'])
@@ -38,7 +38,7 @@ plt.yticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'
 plt.colorbar(label=r'$TE$')
 plt.show()
 
-IF = information_flux_causal_map(X, taus, k=5)
+IF, _, _ = information_flow_causal_map(X, taus, k=5)
 
 plt.imshow(IF, cmap=cm, vmin=0.e0, extent=None, origin='lower')
 plt.xticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'$\Pi_{4}$'])
@@ -46,6 +46,7 @@ plt.yticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'
 plt.colorbar(label=r'$dI/dt$')
 plt.show()
 
+'''
 EE = np.zeros((Nv,Nv))
 for j in tqdm(range(Nv)):
   for i in range(Nv):
@@ -73,4 +74,4 @@ plt.xticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'
 plt.yticks(ticks=[0,1,2,3], labels=[r'$\Pi_{1}$', r'$\Pi_{2}$', r'$\Pi_{3}$', r'$\Pi_{4}$'])
 plt.colorbar(label=r'$\Delta EE$')
 plt.show()
-
+'''
