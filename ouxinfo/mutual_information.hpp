@@ -238,18 +238,30 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
     resultSet.init(ret_index.data(), out_dist.data());
     index_XYZ.findNeighbors(resultSet, &XYZ[i * dxyz], SearchParameters(0));
     T eps = out_dist[k];
-    // --- Y radius search ---
+    // --- Z radius search ---
     std::vector<nanoflann::ResultItem<size_t,T>> matches_Z;
     index_Z.radiusSearch(&Z[i*dz],    eps, matches_Z,  nanoflann::SearchParameters(0));
-    nZ[i] = matches_Z.size() - 1;
+    int count_Z = 0;
+    for (const auto& match : matches_Z) {
+      if (match.first != i && match.second < eps) count_Z++;
+    }
+    nZ[i] = count_Z;
     // --- YZ radius search ---
     std::vector<nanoflann::ResultItem<size_t,T>> matches_YZ;
     index_YZ.radiusSearch(&YZ[i*dyz], eps, matches_YZ, nanoflann::SearchParameters(0));
-    nYZ[i] = matches_YZ.size() - 1;
+    int count_YZ = 0;
+    for (const auto& match : matches_YZ) {
+      if (match.first != i && match.second < eps) count_YZ++;
+    }
+    nYZ[i] = count_YZ;
     // --- XZ radius search ---
     std::vector<nanoflann::ResultItem<size_t,T>> matches_XZ;
     index_XZ.radiusSearch(&XZ[i*dxz], eps, matches_XZ, nanoflann::SearchParameters(0));
-    nXZ[i] = matches_XZ.size() - 1;
+    int count_XZ = 0;
+    for (const auto& match : matches_XZ) {
+      if (match.first != i && match.second < eps) count_XZ++;
+    }
+    nXZ[i] = count_XZ;
   }
   // calc conditional mutual information
   T mean_psi_nZ  = 0.e0;

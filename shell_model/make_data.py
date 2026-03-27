@@ -15,7 +15,7 @@ eps   = 0.5e0
 f0    = (1.e0 + 1.j)*5e-3
 # Time evelopment
 dt    = 1.e-4
-endT  = 2.e3
+endT  = 2.e4
 Np    = 100000
 
 
