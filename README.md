@@ -17,3 +17,8 @@ OUxInfo is a C++ based fast Shannon entropy estimator for Python.
     $ pip install .
     ~~~
 
+## License
+This project uses nanoflann (BSD license)
+ * Copyright 2008-2009  Marius Muja (mariusm@cs.ubc.ca). All rights reserved.
+ * Copyright 2008-2009  David G. Lowe (lowe@cs.ubc.ca). All rights reserved.
+ * Copyright 2011-2025  Jose Luis Blanco (joseluisblancoc@gmail.com).
