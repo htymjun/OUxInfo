@@ -11,11 +11,6 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 ### Requirements
 * Python >= 3.10 (>= 3.12 recommended)
 * GCC >= 11 (>= 13 recommended)
-* Boost C++ Libraries (not bundled)
-#### Install Boost on Ubuntu:
-~~~bash
-$ sudo apt install libboost-dev
-~~~
 
 ### Install via pip
 ~~~bash
@@ -31,7 +26,7 @@ $ pip install .
 * numba
 
 #### C++ dependencies
-* Boost C++ Libraries (Boost Software License)
+* Boost C++ Libraries (Boost Software License, included in this repository)
 * nanoflann (BSD License, included in this repository)
 
 ## Usage (example)
@@ -55,7 +50,13 @@ This project depends on the following libraries;
 Redistribution and use in source and binary forms are permitted under the BSD License.
 
 ### Boost C++ Libraries (Boost Software License 1.0)
-Boost is not distributed with this package and must be installed separately by the user.
+ * Copyright John Maddock 2006, 2007.
+ * Copyright Paul A. Bristow 2006, 2007, 2009, 2010.
+Use, modification and distribution are subject to the
+Boost Software License, Version 1.0. (See accompanying file
+LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+Boost is now bundled in the `third_party/` directory and is used automatically during build.
 
 ### pybind11 (BSD License)
 Used for Python bindings.
