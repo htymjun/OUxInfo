@@ -11,8 +11,14 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 ### Requirements
 * Python >= 3.10 (>= 3.12 recommended)
 * GCC >= 11 (>= 13 recommended)
+* OpenMP support (-fopenmp)
 
 ### Install via pip
+* PyPI
+~~~bash
+$ pip install ouxinfo
+~~~
+* Clone this repository and
 ~~~bash
 $ pip install .
 ~~~
