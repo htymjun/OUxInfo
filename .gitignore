@@ -1,9 +1,22 @@
 *.o
 *.so
 *.png
-.vscode
+legacy/
+experiments/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# wheel unpack
+wheel_contents/
+
+# python
+ouxinfo/__pycache__
 tutorials/__pycache__
 shell_model/__pycache__
-build
-ouxinfo.egg-info
+
+# editor
+.vscode
 

@@ -1,0 +1,5 @@
+recursive-include ouxinfo *.hpp
+recursive-include third_party *
+include README.md
+include LICENSE
+
