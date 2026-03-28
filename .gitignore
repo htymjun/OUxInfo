@@ -1,6 +1,8 @@
 *.o
 *.so
 *.png
+legacy/
+experiments/
 .vscode
 tutorials/__pycache__
 shell_model/__pycache__

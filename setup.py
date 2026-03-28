@@ -8,28 +8,6 @@ os.environ["CC"]  = "gcc"
 os.environ["CXX"] = "g++"
 
 
-# check boost
-def check_boost():
-  include_candidates = [
-    "/usr/include",
-    "/usr/local/include",
-    os.environ.get("BOOST_ROOT", ""),
-  ]
-  for inc in include_candidates:
-    if inc and os.path.exists(os.path.join(inc, "boost", "version.hpp")):
-      return inc
-  return None
-
-
-boost_include = check_boost()
-if boost_include is None:
-  sys.stderr.write(
-    "Boost not found.\n"
-    "Please install Boost (e.g. libboost-dev, boost, boost-devel).\n"
-  )
-  sys.exit(1)
-
-
 class CustomBuildExt(build_ext):
   def build_extensions(self):
     opts = ["-Ofast", "-march=native", "-mfma", "-fopenmp", "-std=c++14", "-fPIC"]
@@ -41,7 +19,7 @@ ext_modules = [
   Pybind11Extension(
     "ouxinfo._core",
     ["ouxinfo/ouxinfo.cpp"],
-    include_dirs=["ouxinfo"],
+    include_dirs=["ouxinfo", "third_party"],
     cxx_std=14,
     extra_compile_args=["-Ofast", "-march=native", "-mfma", "-fopenmp"],
     extra_link_args=["-fopenmp"],
