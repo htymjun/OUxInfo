@@ -13,7 +13,7 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 
 ## Installation
 ### Requirements
-* Python >= 3.12 (== 3.12 recommended)
+* Python >= 3.12 (3.13 recommended)
 * GCC >= 11 (>= 13 recommended)
 * OpenMP support (-fopenmp)
 
