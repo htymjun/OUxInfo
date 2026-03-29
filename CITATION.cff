@@ -7,6 +7,7 @@ authors:
 - family-names: "Ota"
   given-names: "Yuto"
 title: "OUxInfo"
-version: 0.1.1
+version: 0.1.2
+doi: 10.5281/zenodo.19303017
 date-released: 2026-03-28
 url: "https://github.com/htymjun/OUxInfo"
