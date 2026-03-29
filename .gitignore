@@ -14,8 +14,10 @@ wheel_contents/
 
 # python
 ouxinfo/__pycache__
+tests/__pycache__
 tutorials/__pycache__
 shell_model/__pycache__
+venv_test/
 
 # editor
 .vscode
