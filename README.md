@@ -48,6 +48,25 @@ x = np.random.normal(0.e0, 1.e0, 10000)
 H = shannon_entropy(x.reshape(-1,1), k=5)
 ~~~
 
+## Related Publication
+This repository contains the implementation used in the following publication:
+
+Jun Hatayama, Kento Tanaka, and Toshinori Kouchi. "Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory." Computers & Fluids (2026): 107016.
+
+~~~bash
+@article{hatayama2026nonlinear,
+  title={Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory},
+  author={Hatayama, Jun and Tanaka, Kento and Kouchi, Toshinori},
+  journal={Computers \& Fluids},
+  pages={107016},
+  year={2026},
+  publisher={Elsevier}
+}
+~~~
+
+The repository was made publicly available after publication to improve reproducibility.
+However, this version may differ slightly from the version used in the paper.
+
 ## License
 This project is released under MIT license.
 
