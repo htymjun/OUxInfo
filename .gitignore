@@ -1,6 +1,7 @@
 *.o
 *.so
 *.png
+*.npz
 legacy/
 experiments/
 

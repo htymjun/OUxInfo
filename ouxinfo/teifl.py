@@ -7,11 +7,14 @@ from ._core import information_flow_causal_map
 from .backwardTE import backward_transfer_entropy
 
 
-def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, result_dir='.'):
+def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, result_dir='.', multi=False):
   '''
   Parameters
   ----------
-  X          : ndarray (N, dim)
+  X          : ndarray (N, Nt, dim)
+               N: number of variables
+               Nt: length of time series
+               dim: dimension of physical quantities (optional)
   tau        : int, optional
                Length of time delay
   dt         : double, optional
@@ -36,8 +39,10 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   # Transfer Entropy, Information Flow, Leak
   # sTE > mTE > IF
   # error check
-  if max_m < 2:
+  if max_m < 2 and multi is True:
     raise InvalidInputError("m must be greater than 2")
+  if X.ndim not in [2, 3]:
+    raise ValueError("Input array X must be 2D (N,Nt) or 3D (N,Nt,dim)")
   N = X.shape[0]
   # time delay
   taus = np.zeros(N, dtype=np.int32)
@@ -48,37 +53,38 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   sTE = transfer_entropy_causal_map(X, taus, dt=dt, k=k, n_threads=n_threads)
   t_end = time.time()
   print("Elapsed time:", t_end - t_start, " [s]")
-  # multi-time step transfer entropy
-  print("calc multi-time step transfer entropy & backward transfer entropy")
-  t_start = time.time()
-  mTE  = np.zeros_like(sTE)
-  bTE  = np.zeros_like(sTE)
-  mmap = np.zeros_like(sTE, dtype=np.int32)
-  for j in range(N):
-    for i in range(N):
-      if i == j:
-        mTE[j,i] = np.nan
-        bTE[j,i] = np.nan
-      else:
-        xj_ = X[j].reshape(-1,1) if X[j].ndim == 1 else X[j]
-        xi_ = X[i].reshape(-1,1) if X[i].ndim == 1 else X[i]
-        xj_ = np.ascontiguousarray(xj_)
-        xi_ = np.ascontiguousarray(xi_)
-        # forward multi-time step transfer entropy
-        prev_tmp = sTE[j,i]
-        for m in range(2, max_m+1):
-          tmp = transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
-          mTE[j,i] = tmp
-          if prev_tmp > 1e-10:
-            decrease_rate = (prev_tmp - tmp) / prev_tmp
-            if decrease_rate <= tol:
-              break
-          prev_tmp  = tmp
-          mmap[j,i] = m
-        # backward multi-time step transfer entropy
-        bTE[j,i] = backward_transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
-  t_end = time.time()
-  print("Elapsed time:", t_end - t_start, " [s]")
+  if multi is True:
+    # multi-time step transfer entropy
+    print("calc multi-time step transfer entropy & backward transfer entropy")
+    t_start = time.time()
+    mTE  = np.zeros_like(sTE)
+    bTE  = np.zeros_like(sTE)
+    mmap = np.zeros_like(sTE, dtype=np.int32)
+    for j in range(N):
+      for i in range(N):
+        if i == j:
+          mTE[j,i] = np.nan
+          bTE[j,i] = np.nan
+        else:
+          xj_ = X[j].reshape(-1,1) if X[j].ndim == 1 else X[j]
+          xi_ = X[i].reshape(-1,1) if X[i].ndim == 1 else X[i]
+          xj_ = np.ascontiguousarray(xj_)
+          xi_ = np.ascontiguousarray(xi_)
+          # forward multi-time step transfer entropy
+          prev_tmp = sTE[j,i]
+          for m in range(2, max_m+1):
+            tmp = transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
+            mTE[j,i] = tmp
+            if prev_tmp > 1e-10:
+              decrease_rate = (prev_tmp - tmp) / prev_tmp
+              if decrease_rate <= tol:
+                break
+            prev_tmp  = tmp
+            mmap[j,i] = m
+          # backward multi-time step transfer entropy
+          bTE[j,i] = backward_transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
+    t_end = time.time()
+    print("Elapsed time:", t_end - t_start, " [s]")
   # information flow
   print("calc information flow")
   t_start = time.time()
@@ -87,7 +93,10 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   print("Elapsed time:", t_end - t_start, " [s]")
   os.makedirs(result_dir, exist_ok=True)
   file_path = os.path.join(result_dir, 'teifl.npz')
-  np.savez_compressed(file_path, sTE=sTE, mTE=mTE, bTE=bTE, mmap=mmap, IF=IF, Leak=Leak, dI=dI)
+  if multi is True:
+    np.savez_compressed(file_path, sTE=sTE, mTE=mTE, bTE=bTE, mmap=mmap, IF=IF, Leak=Leak, dI=dI)
+  else:
+    np.savez_compressed(file_path, sTE=sTE, IF=IF, Leak=Leak, dI=dI)
 
 
 def plot_TEIFL(file_path, labels):
@@ -105,10 +114,15 @@ def plot_TEIFL(file_path, labels):
   '''
   result_dir = os.path.dirname(file_path)
   teifl = np.load(file_path)
+  if 'mTE' in teifl:
+    multi = True
+  else:
+    multi = False
   sTE  = teifl['sTE']
-  mTE  = teifl['mTE']
-  bTE  = teifl['bTE']
-  mmap = teifl['mmap']
+  if multi is True:
+    mTE  = teifl['mTE']
+    bTE  = teifl['bTE']
+    mmap = teifl['mmap']
   IF   = teifl['IF']
   Leak = teifl['Leak']
   dI   = teifl['dI']
@@ -127,31 +141,32 @@ def plot_TEIFL(file_path, labels):
   plt.tight_layout()
   plt.savefig(os.path.join(result_dir, "sTE.png"))
   plt.close()
-  # dimention of multi-time step transfer entropy
-  plt.imshow(mmap, cmap=bone, extent=None, origin='lower')
-  plt.xticks(ticks=ticks, labels=labels)
-  plt.yticks(ticks=ticks, labels=labels)
-  plt.colorbar(label=r'$m$')
-  plt.tight_layout()
-  plt.savefig(os.path.join(result_dir, "m.png"))
-  plt.close()
-  # multi-time step transfer entropy
-  plt.imshow(mTE, cmap=bone, extent=None, origin='lower')
-  plt.xticks(ticks=ticks, labels=labels)
-  plt.yticks(ticks=ticks, labels=labels)
-  plt.colorbar(label=r'$mTE$')
-  plt.tight_layout()
-  plt.savefig(os.path.join(result_dir, "mTE.png"))
-  plt.close()
-  # transfer entropy - backward transfer entropy
-  val = np.nanmax(np.abs(mTE - bTE))
-  plt.imshow(mTE - bTE, vmin=-val, vmax=val, cmap=RdBu, extent=None, origin='lower')
-  plt.xticks(ticks=ticks, labels=labels)
-  plt.yticks(ticks=ticks, labels=labels)
-  plt.colorbar(label='$\\Delta fTE - \\Delta bTE$')
-  plt.tight_layout()
-  plt.savefig(os.path.join(result_dir, "fTE_bTE.png"))
-  plt.close()
+  if multi is True:
+    # dimention of multi-time step transfer entropy
+    plt.imshow(mmap, cmap=bone, extent=None, origin='lower')
+    plt.xticks(ticks=ticks, labels=labels)
+    plt.yticks(ticks=ticks, labels=labels)
+    plt.colorbar(label=r'$m$')
+    plt.tight_layout()
+    plt.savefig(os.path.join(result_dir, "m.png"))
+    plt.close()
+    # multi-time step transfer entropy
+    plt.imshow(mTE, cmap=bone, extent=None, origin='lower')
+    plt.xticks(ticks=ticks, labels=labels)
+    plt.yticks(ticks=ticks, labels=labels)
+    plt.colorbar(label=r'$mTE$')
+    plt.tight_layout()
+    plt.savefig(os.path.join(result_dir, "mTE.png"))
+    plt.close()
+    # transfer entropy - backward transfer entropy
+    val = np.nanmax(np.abs(mTE - bTE))
+    plt.imshow(mTE - bTE, vmin=-val, vmax=val, cmap=RdBu, extent=None, origin='lower')
+    plt.xticks(ticks=ticks, labels=labels)
+    plt.yticks(ticks=ticks, labels=labels)
+    plt.colorbar(label='$\\Delta fTE - \\Delta bTE$')
+    plt.tight_layout()
+    plt.savefig(os.path.join(result_dir, "fTE_bTE.png"))
+    plt.close()
   # information flow
   val = np.nanmax(np.abs(IF))
   plt.imshow(IF, vmin=-val, vmax=val, cmap=RdBu, extent=None, origin='lower')
@@ -180,7 +195,7 @@ def plot_TEIFL(file_path, labels):
   plt.savefig(os.path.join(result_dir, "dI.png"))
   plt.close()
   # sensor capacity
-  sSC = np.divide(IF, sTE, where=~np.isnan(sTE))
+  sSC = np.divide(IF, sTE, out=np.zeros_like(IF), where=~np.isnan(sTE))
   sSC[np.isnan(sTE)] = np.nan
   plt.imshow(sSC, vmin=-1.2, vmax=1.2, cmap=RdBu, extent=None, origin='lower')
   plt.xticks(ticks=ticks, labels=labels)
@@ -189,14 +204,15 @@ def plot_TEIFL(file_path, labels):
   plt.tight_layout()
   plt.savefig(os.path.join(result_dir, "sSC.png"))
   plt.close()
-  # sensor capacity
-  mSC = np.divide(IF, mTE, where=~np.isnan(mTE))
-  mSC[np.isnan(mTE)] = np.nan
-  plt.imshow(mSC, vmin=-1.2, vmax=1.2, cmap=RdBu, extent=None, origin='lower')
-  plt.xticks(ticks=ticks, labels=labels)
-  plt.yticks(ticks=ticks, labels=labels)
-  plt.colorbar(label=r'$mSC$')
-  plt.tight_layout()
-  plt.savefig(os.path.join(result_dir, "mSC.png"))
-  plt.close()
+  if multi is True:
+    # sensor capacity
+    mSC = np.divide(IF, mTE, out=np.zeros_like(IF), where=~np.isnan(mTE))
+    mSC[np.isnan(mTE)] = np.nan
+    plt.imshow(mSC, vmin=-1.2, vmax=1.2, cmap=RdBu, extent=None, origin='lower')
+    plt.xticks(ticks=ticks, labels=labels)
+    plt.yticks(ticks=ticks, labels=labels)
+    plt.colorbar(label=r'$mSC$')
+    plt.tight_layout()
+    plt.savefig(os.path.join(result_dir, "mSC.png"))
+    plt.close()
 
