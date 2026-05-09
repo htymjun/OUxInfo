@@ -2,7 +2,6 @@
 *.so
 *.png
 *.npz
-legacy/
 experiments/
 
 # build artifacts

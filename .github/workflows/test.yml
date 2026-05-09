@@ -1,0 +1,26 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install GCC and G++
+        run: sudo apt-get update && sudo apt-get install -y gcc g++
+
+      - name: Install dependencies
+        run: pip install ouxinfo infomeasure pytest
+
+      - name: Run tests
+        run: pytest tests/ -v
