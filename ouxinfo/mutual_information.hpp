@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream> // for std::cerr, std::cout
+#include <omp.h>
 
 
 using namespace nanoflann;
@@ -48,9 +49,12 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   index_Y.buildIndex();
   index_XY.buildIndex();
   std::vector<int> nX(N, 0), nY(N, 0);
-  // indices and distances
+  #pragma omp parallel
+  {
   std::vector<size_t> ret_index(k+1);
   std::vector<T> out_dist(k+1);
+  std::vector<nanoflann::ResultItem<size_t,T>> matches_X, matches_Y;
+  #pragma omp for schedule(static)
   for (int i = 0; i < N; i++) {
     // --- XY spacekNN (Chebyshev) ---
     KNNResultSet<T> resultSet(k+1);
@@ -58,21 +62,20 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
     index_XY.findNeighbors(resultSet, &XY[i * dxy], SearchParameters(0));
     T eps = out_dist[k];
     // --- X radius search ---
-    std::vector<nanoflann::ResultItem<size_t,T>> matches_X;
     index_X.radiusSearch(&X[i*dx], eps, matches_X, nanoflann::SearchParameters(0));
     int count_X = 0;
     for (const auto& match : matches_X) {
-      if (match.first != i && match.second < eps) count_X++;
+      if (match.first != (size_t)i && match.second < eps) count_X++;
     }
     nX[i] = count_X;
     // --- Y radius search ---
-    std::vector<nanoflann::ResultItem<size_t,T>> matches_Y;
     index_Y.radiusSearch(&Y[i*dy], eps, matches_Y, nanoflann::SearchParameters(0));
     int count_Y = 0;
     for (const auto& match : matches_Y) {
-      if (match.first != i && match.second < eps) count_Y++;
+      if (match.first != (size_t)i && match.second < eps) count_Y++;
     }
     nY[i] = count_Y;
+  }
   }
   // calc mutual information
   T mean_psi_nX = 0.e0;
@@ -228,40 +231,40 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
   index_YZ.buildIndex();
   index_XZ.buildIndex();
   std::vector<int> nZ(N, 0), nYZ(N, 0), nXZ(N, 0);
-  // indices and distances
+  #pragma omp parallel
+  {
   std::vector<size_t> ret_index(k+1);
   std::vector<T> out_dist(k+1);
-  //T eps_all = 0; 
+  std::vector<nanoflann::ResultItem<size_t,T>> matches_Z, matches_YZ, matches_XZ;
+  #pragma omp for schedule(static)
   for (int i = 0; i < N; i++) {
-    // --- XY spacekNN (Chebyshev) ---
+    // --- XYZ space kNN (Chebyshev) ---
     KNNResultSet<T> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist.data());
     index_XYZ.findNeighbors(resultSet, &XYZ[i * dxyz], SearchParameters(0));
     T eps = out_dist[k];
     // --- Z radius search ---
-    std::vector<nanoflann::ResultItem<size_t,T>> matches_Z;
     index_Z.radiusSearch(&Z[i*dz],    eps, matches_Z,  nanoflann::SearchParameters(0));
     int count_Z = 0;
     for (const auto& match : matches_Z) {
-      if (match.first != i && match.second < eps) count_Z++;
+      if (match.first != (size_t)i && match.second < eps) count_Z++;
     }
     nZ[i] = count_Z;
     // --- YZ radius search ---
-    std::vector<nanoflann::ResultItem<size_t,T>> matches_YZ;
     index_YZ.radiusSearch(&YZ[i*dyz], eps, matches_YZ, nanoflann::SearchParameters(0));
     int count_YZ = 0;
     for (const auto& match : matches_YZ) {
-      if (match.first != i && match.second < eps) count_YZ++;
+      if (match.first != (size_t)i && match.second < eps) count_YZ++;
     }
     nYZ[i] = count_YZ;
     // --- XZ radius search ---
-    std::vector<nanoflann::ResultItem<size_t,T>> matches_XZ;
     index_XZ.radiusSearch(&XZ[i*dxz], eps, matches_XZ, nanoflann::SearchParameters(0));
     int count_XZ = 0;
     for (const auto& match : matches_XZ) {
-      if (match.first != i && match.second < eps) count_XZ++;
+      if (match.first != (size_t)i && match.second < eps) count_XZ++;
     }
     nXZ[i] = count_XZ;
+  }
   }
   // calc conditional mutual information
   T mean_psi_nZ  = 0.e0;
