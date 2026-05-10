@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from ._core import information_flow_causal_map
 
 
@@ -11,8 +12,8 @@ def information_flux_1d(data, dt=1.0, tau=1, k=5, n_threads=1):
 
     Parameters
     ----------
-    data : ndarray, shape (nx, nt)
-        Spatiotemporal data. data[i, :] is the time series at spatial cell i.
+    data : ndarray, shape (nx, nt) or (nz, nx, nt)
+        Spatiotemporal data. data[i, :] or data[:, i, :] is the time series at spatial cell i.
         Must be float64 (or convertible).
     dt : float, optional
         Physical time step between samples. Default 1.0.
@@ -36,30 +37,48 @@ def information_flux_1d(data, dt=1.0, tau=1, k=5, n_threads=1):
         'Leak_bwd' : leak associated with the backward direction (== Leak_fwd)
     """
     data = np.asarray(data, dtype=np.float64)
-    if data.ndim != 2:
-      raise ValueError(f"data must be 2D (nx, nt), got shape {data.shape}")
-    nx, nt = data.shape
+    if data.ndim == 2:
+      nx, nt = data.shape
+    elif data.ndim == 3:
+      nz, nx, nt = data.shape
+    else:
+      raise ValueError(f"data must be 2D (nx, nt) or 3D (nz, nx, nt), got shape {data.shape}")
     if nx < 2:
       raise ValueError("data must have at least 2 spatial cells (nx >= 2)")
 
     n_ifaces = nx - 1
     taus = np.array([tau, tau], dtype=np.int32)
 
-    J_fwd    = np.empty(n_ifaces)
-    J_bwd    = np.empty(n_ifaces)
-    Leak_fwd = np.empty(n_ifaces)
-    Leak_bwd = np.empty(n_ifaces)
+    J_fwd    = np.zeros(n_ifaces)
+    J_bwd    = np.zeros(n_ifaces)
+    Leak_fwd = np.zeros(n_ifaces)
+    Leak_bwd = np.zeros(n_ifaces)
 
-    for i in range(n_ifaces):
-      # Pair shape (2, nt): variable 0 = cell i, variable 1 = cell i+1
-      pair = np.ascontiguousarray(data[i:i+2, :])
-      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k, n_threads=n_threads)
-      # IF[j, i] = flow from variable i to variable j
-      J_fwd[i]    = IF[1, 0]    # cell i   → cell i+1
-      J_bwd[i]    = IF[0, 1]    # cell i+1 → cell i
-      Leak_fwd[i] = Leak[1, 0]
-      Leak_bwd[i] = Leak[0, 1]  # symmetric: always equal to Leak_fwd[i]
-
+    if data.ndim == 2:
+      for i in tqdm(range(n_ifaces)):
+        # Pair shape (2, nt): variable 0 = cell i, variable 1 = cell i+1
+        pair = np.ascontiguousarray(data[i:i+2, :])
+        IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k, n_threads=n_threads)
+        # IF[j, i] = flow from variable i to variable j
+        J_fwd[i]    = IF[1, 0]    # cell i   → cell i+1
+        J_bwd[i]    = IF[0, 1]    # cell i+1 → cell i
+        Leak_fwd[i] = Leak[1, 0]
+        Leak_bwd[i] = Leak[0, 1]  # symmetric: always equal to Leak_fwd[i]
+    else:
+      for k in tqdm(range(nz)):
+        for i in range(n_ifaces):
+          # Pair shape (2, nt): variable 0 = cell i, variable 1 = cell i+1
+          pair = np.ascontiguousarray(data[k, i:i+2, :])
+          IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k, n_threads=n_threads)
+          # IF[j, i] = flow from variable i to variable j
+          J_fwd[i]    += IF[1, 0]    # cell i   → cell i+1
+          J_bwd[i]    += IF[0, 1]    # cell i+1 → cell i
+          Leak_fwd[i] += Leak[1, 0]
+          Leak_bwd[i] += Leak[0, 1]  # symmetric: always equal to Leak_fwd[i]
+      J_fwd /= nz
+      J_bwd /= nz
+      Leak_fwd /= nz
+      Leak_bwd /= nz
     return {
       'J_fwd':    J_fwd,
       'J_bwd':    J_bwd,
