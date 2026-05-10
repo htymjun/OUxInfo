@@ -28,7 +28,7 @@ ext_modules = [
 
 setup(
   name="ouxinfo",
-  version="0.1.1",
+  version="0.1.3",
   packages=["ouxinfo"],
   description="Fast Shannon entropy estimator using C++",
   long_description=long_description,
