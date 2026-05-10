@@ -20,7 +20,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc g++
 
       - name: Install dependencies
-        run: pip install setuptools pybind11 infomeasure pytest
+        run: pip install setuptools pybind11 infomeasure pytest build
 
       - name: Build the project
         run: bash ./rebuild.sh
