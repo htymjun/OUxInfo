@@ -1,6 +1,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/ouxinfo.svg)](https://pypi.org/project/ouxinfo/)
 [![Downloads](https://img.shields.io/pypi/dm/ouxinfo)](https://pypi.org/project/ouxinfo/)
-[![DOI](https://zenodo.org/badge/DOI/xx.xxxx/zenodo.xxxxx.svg)](https://doi.org/xx.xxxx/zenodo.xxxxx)
+[![DOI](https://zenodo.org/badge/1057221883.svg)](https://doi.org/10.5281/zenodo.19303016)
 
 # OUxInfo
 OUxInfo is a high-performance Shannon entropy estimator for Python, powered by a C++ backend.
@@ -13,7 +13,7 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 
 ## Installation
 ### Requirements
-* Python >= 3.10 (>= 3.12 recommended)
+* Python >= 3.12 (3.13 recommended)
 * GCC >= 11 (>= 13 recommended)
 * OpenMP support (-fopenmp)
 
@@ -47,6 +47,25 @@ from ouxinfo import shannon_entropy
 x = np.random.normal(0.e0, 1.e0, 10000)
 H = shannon_entropy(x.reshape(-1,1), k=5)
 ~~~
+
+## Related Publication
+This repository contains the implementation used in the following publication:
+
+Jun Hatayama, Kento Tanaka, and Toshinori Kouchi. "Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory." Computers & Fluids (2026): 107016.
+
+~~~bash
+@article{hatayama2026nonlinear,
+  title={Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory},
+  author={Hatayama, Jun and Tanaka, Kento and Kouchi, Toshinori},
+  journal={Computers \& Fluids},
+  pages={107016},
+  year={2026},
+  publisher={Elsevier}
+}
+~~~
+
+The repository was made publicly available after publication to improve reproducibility.
+However, this version may differ slightly from the version used in the paper.
 
 ## License
 This project is released under MIT license.
