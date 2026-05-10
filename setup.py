@@ -44,6 +44,7 @@ setup(
     'matplotlib',
     'scipy',
     'numba',
+    'tqdm',
   ],
 )
 

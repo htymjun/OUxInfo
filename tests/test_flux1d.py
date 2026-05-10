@@ -70,6 +70,29 @@ def test_flux1d_independent_cells_small_net_flux():
 def test_flux1d_input_validation():
     import pytest
     with pytest.raises(ValueError, match="2D"):
-        information_flux_1d(np.zeros((4, 10, 2)))
+        information_flux_1d(np.zeros((2, 3, 4, 5)))
     with pytest.raises(ValueError, match="nx >= 2"):
         information_flux_1d(np.zeros((1, 100)))
+    with pytest.raises(ValueError, match="nx >= 2"):
+        information_flux_1d(np.zeros((4, 1, 100)))
+
+
+def test_flux1d_3d_output_shape():
+    rng = np.random.default_rng(10)
+    nz, nx, nt = 3, 5, 1000
+    data = rng.standard_normal((nz, nx, nt))
+    result = information_flux_1d(data, dt=1.0, tau=1, k=5)
+    for key in ('J_fwd', 'J_bwd', 'J_net', 'J_sym', 'Leak_fwd', 'Leak_bwd'):
+        assert key in result, f"missing key '{key}'"
+        assert result[key].shape == (nx - 1,), (
+            f"{key}: expected shape ({nx-1},), got {result[key].shape}")
+
+
+def test_flux1d_3d_derived_quantities():
+    rng = np.random.default_rng(11)
+    nz, nx, nt = 2, 3, 1000
+    data = rng.standard_normal((nz, nx, nt))
+    r = information_flux_1d(data, dt=1.0, tau=1, k=5)
+    np.testing.assert_allclose(r['J_net'], r['J_fwd'] - r['J_bwd'])
+    np.testing.assert_allclose(r['J_sym'], 0.5 * (r['J_fwd'] + r['J_bwd']))
+    np.testing.assert_allclose(r['Leak_fwd'], r['Leak_bwd'])
