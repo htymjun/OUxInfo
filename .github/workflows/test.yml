@@ -20,7 +20,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc g++
 
       - name: Install dependencies
-        run: pip install ouxinfo infomeasure pytest
+        run: pip install infomeasure pytest
+
+      - name: Build the project
+        run: python setup.py build
 
       - name: Run tests
         run: pytest tests/ -v
