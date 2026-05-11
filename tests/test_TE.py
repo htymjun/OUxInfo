@@ -21,8 +21,8 @@ def test_transfer_entropy_monotone_in_coupling():
   asym_prev = -np.inf
   for alpha in alphas:
     x, y = make_linear_driver(alpha, N, seed=42)
-    TE_xy = transfer_entropy(x, y, k=5, tau=1, m=1, lag=1, trial=0)
-    TE_yx = transfer_entropy(y, x, k=5, tau=1, m=1, lag=1, trial=0)
+    TE_xy = transfer_entropy(x, y, k=5, tau=1, m=1, lag=1, trial=1)
+    TE_yx = transfer_entropy(y, x, k=5, tau=1, m=1, lag=1, trial=1)
     asym = TE_xy - TE_yx
     assert asym > asym_prev, f"alpha={alpha:.2f}: asymmetry {asym:.4f} not > prev {asym_prev:.4f}"
     asym_prev = asym
@@ -32,8 +32,8 @@ def test_transfer_entropy_causal_direction():
   N = 10000
   for i, alpha in enumerate(np.linspace(1.0e0, 1.5e0, 5)):
     x, y = make_linear_driver(alpha, N, seed=i)
-    TE_xy = transfer_entropy(x, y, k=5, tau=1, m=1, lag=1, trial=0)
-    TE_yx = transfer_entropy(y, x, k=5, tau=1, m=1, lag=1, trial=0)
+    TE_xy = transfer_entropy(x, y, k=5, tau=1, m=1, lag=1, trial=1)
+    TE_yx = transfer_entropy(y, x, k=5, tau=1, m=1, lag=1, trial=1)
     assert TE_xy > TE_yx + 0.05e0, f"alpha={alpha:.2f}: TE(x→y)={TE_xy:.4f}, TE(y→x)={TE_yx:.4f}"
 
 
@@ -42,8 +42,8 @@ def test_transfer_entropy_knn_k_dependence():
   N = 10000
   x, y = make_linear_driver(alpha, N)
   for k in range(3, 16):
-    TE_xy = transfer_entropy(x, y, k=k, tau=1, m=1, lag=1, trial=0)
-    TE_yx = transfer_entropy(y, x, k=k, tau=1, m=1, lag=1, trial=0)
+    TE_xy = transfer_entropy(x, y, k=k, tau=1, m=1, lag=1, trial=1)
+    TE_yx = transfer_entropy(y, x, k=k, tau=1, m=1, lag=1, trial=1)
     assert TE_xy > TE_yx + 0.05e0, f"k={k}: TE(x→y)={TE_xy:.4f}, TE(y→x)={TE_yx:.4f}"
 
 
@@ -85,3 +85,42 @@ def test_transfer_entropy_vs_analytical():
     tol = 0.1e0 * te_true
     assert np.isclose(te_est, te_true, atol=tol), (
       f"c_xy={c_xy}: est={te_est:.4f}, true={te_true:.4f}, tol={tol:.4f}")
+
+
+def save_results():
+  import pathlib
+  import matplotlib.pyplot as plt
+  _results = pathlib.Path(__file__).parent / 'results'
+  _results.mkdir(exist_ok=True)
+  plt.rcParams['font.family'] = 'Times New Roman'
+  plt.rcParams['mathtext.fontset'] = 'stix'
+  plt.rcParams['xtick.direction'] = 'in'
+  plt.rcParams['ytick.direction'] = 'in'
+  plt.rcParams['font.size'] = 20
+
+  N = 5000
+  a, b, sigma = 0.5, 0.5, 1.0
+  c_xys = np.linspace(0.1, 0.8, 8)
+  TE_true_vals, TE_xy_vals, TE_yx_vals = [], [], []
+  for c_xy in c_xys:
+    rng = np.random.default_rng(42)
+    x, y = _gaussian_ar_system(N, a, b, c_xy, sigma, rng)
+    TE_true_vals.append(_analytical_te_gaussian_ar(a, b, c_xy, sigma))
+    TE_xy_vals.append(transfer_entropy(x.reshape(-1, 1), y.reshape(-1, 1), k=5, tau=1, m=1, lag=1, trial=1))
+    TE_yx_vals.append(transfer_entropy(y.reshape(-1, 1), x.reshape(-1, 1), k=5, tau=1, m=1, lag=1, trial=1))
+
+  plt.figure(figsize=(7, 6))
+  plt.plot(c_xys, TE_true_vals, color='black', linestyle='solid',  label=r'$TE_{x \to y}$ (true)')
+  plt.plot(c_xys, TE_xy_vals,   color='blue',  linestyle='none', marker='o', label=r'$TE_{x \to y}$')
+  plt.plot(c_xys, TE_yx_vals,   color='red',   linestyle='none', marker='^', label=r'$TE_{y \to x}$')
+  plt.axhline(0.e0, color='gray', linestyle='dotted')
+  plt.xlabel(r'$c_{xy}$')
+  plt.ylabel('Transfer entropy')
+  plt.legend(frameon=False)
+  plt.savefig(_results / 'TE.png', dpi=150, bbox_inches='tight')
+  plt.close()
+  print(f'Saved {_results / "TE.png"}')
+
+
+if __name__ == '__main__':
+  save_results()

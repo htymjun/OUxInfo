@@ -67,3 +67,42 @@ def test_information_flow_vs_analytical():
     tol = 0.1e0 * IF_true
     assert np.isclose(IF_est, IF_true, atol=tol), (
       f"c_xy={c_xy}: est={IF_est:.4f}, true={IF_true:.4f}, tol={tol:.4f}")
+
+
+def save_results():
+  import pathlib
+  import matplotlib.pyplot as plt
+  _results = pathlib.Path(__file__).parent / 'results'
+  _results.mkdir(exist_ok=True)
+  plt.rcParams['font.family'] = 'Times New Roman'
+  plt.rcParams['mathtext.fontset'] = 'stix'
+  plt.rcParams['xtick.direction'] = 'in'
+  plt.rcParams['ytick.direction'] = 'in'
+  plt.rcParams['font.size'] = 20
+
+  N = 5000
+  a, b, sigma = 0.5e0, 0.5e0, 1.0e0
+  c_xys = np.linspace(0.1e0, 0.8e0, 8)
+  IF_true_vals, IF_xy_vals, IF_yx_vals = [], [], []
+  for c_xy in c_xys:
+    rng = np.random.default_rng(42)
+    x, y = _gaussian_ar_system(N, a, b, c_xy, sigma, rng)
+    IF_true_vals.append(_analytical_if_gaussian_ar(a, b, c_xy, tau=1, dt=1.0, sigma=sigma))
+    IF_xy_vals.append(information_flow(x.reshape(-1, 1), y.reshape(-1, 1), tau=1, dt=1.0, k=5))
+    IF_yx_vals.append(information_flow(y.reshape(-1, 1), x.reshape(-1, 1), tau=1, dt=1.0, k=5))
+
+  plt.figure(figsize=(7, 6))
+  plt.plot(c_xys, IF_true_vals, color='black', linestyle='solid',  label=r'$T_{x \to y}$ (true)')
+  plt.plot(c_xys, IF_xy_vals,   color='blue',  linestyle='none', marker='o', label=r'$T_{x \to y}$')
+  plt.plot(c_xys, IF_yx_vals,   color='red',   linestyle='none', marker='^', label=r'$T_{y \to x}$')
+  plt.axhline(0.e0, color='gray', linestyle='dotted')
+  plt.xlabel(r'$c_{xy}$')
+  plt.ylabel('Information flow')
+  plt.legend(frameon=False)
+  plt.savefig(_results / 'IF.png', dpi=150, bbox_inches='tight')
+  plt.close()
+  print(f'Saved {_results / "IF.png"}')
+
+
+if __name__ == '__main__':
+  save_results()
