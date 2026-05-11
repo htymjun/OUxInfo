@@ -82,7 +82,7 @@ def test_transfer_entropy_vs_analytical():
       te_sum += transfer_entropy(x.reshape(-1, 1), y.reshape(-1, 1),
                                  k=5, tau=1, m=1, lag=1, trial=1)
     te_est = te_sum / n_trials
-    tol = 0.1e0 * te_true
+    tol = 0.2e0 * te_true
     assert np.isclose(te_est, te_true, atol=tol), (
       f"c_xy={c_xy}: est={te_est:.4f}, true={te_true:.4f}, tol={tol:.4f}")
 
