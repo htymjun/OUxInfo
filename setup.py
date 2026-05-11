@@ -45,6 +45,7 @@ setup(
     'scipy',
     'numba',
     'tqdm',
+    'joblib',
   ],
 )
 

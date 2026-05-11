@@ -29,7 +29,7 @@ for t in range(nt):
 data = data[:, 1:]  # shape (nx, nt)
 
 # --- compute 1D information flux -------------------------------------------
-result = information_flux_1d(data, dt=1.e0, tau=1, k=5)
+result = information_flux_1d(data, dt=1.e0, tau=1, k=5, n_jobs=4)
 
 # interface positions i + 1/2
 x_iface = np.arange(nx - 1) + 0.5e0
@@ -56,8 +56,8 @@ plt.show()
 
 # --- plot 3: coupling strength vs leak -------------------------------------
 plt.figure(figsize=(7, 7))
-plt.plot(x_iface, result['J_sym'],    color='blue', linestyle='solid',  label=r'$J^{\rm sym}$')
-plt.plot(x_iface, result['Leak_fwd'], color='red',  linestyle='dashed', label=r'Leak')
+plt.plot(x_iface, result['J_sym'], color='blue', linestyle='solid',  label=r'$J^{\rm sym}$')
+plt.plot(x_iface, result['Leak'],  color='red',  linestyle='dashed', label=r'Leak')
 plt.axhline(0.e0, color='gray', linestyle='dotted')
 plt.xlabel(r'$i + \frac{1}{2}$', fontsize=20)
 plt.ylabel(r'information flux', fontsize=20)

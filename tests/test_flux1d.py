@@ -23,7 +23,7 @@ def test_flux1d_output_shape():
     nx, nt = 5, 3000
     data = rng.standard_normal((nx, nt))
     result = information_flux_1d(data, dt=1.0, tau=1, k=5)
-    for key in ('J_fwd', 'J_bwd', 'J_net', 'J_sym', 'Leak_fwd', 'Leak_bwd'):
+    for key in ('J_fwd', 'J_bwd', 'J_net', 'J_sym', 'Leak'):
         assert key in result, f"missing key '{key}'"
         assert result[key].shape == (nx - 1,), (
             f"{key}: expected shape ({nx-1},), got {result[key].shape}")
@@ -36,8 +36,6 @@ def test_flux1d_derived_quantities():
     r = information_flux_1d(data, dt=1.0, tau=1, k=5)
     np.testing.assert_allclose(r['J_net'], r['J_fwd'] - r['J_bwd'])
     np.testing.assert_allclose(r['J_sym'], 0.5 * (r['J_fwd'] + r['J_bwd']))
-    # Leak is symmetric per interface pair
-    np.testing.assert_allclose(r['Leak_fwd'], r['Leak_bwd'])
 
 
 def test_flux1d_causal_direction():
@@ -82,7 +80,7 @@ def test_flux1d_3d_output_shape():
     nz, nx, nt = 3, 5, 1000
     data = rng.standard_normal((nz, nx, nt))
     result = information_flux_1d(data, dt=1.0, tau=1, k=5)
-    for key in ('J_fwd', 'J_bwd', 'J_net', 'J_sym', 'Leak_fwd', 'Leak_bwd'):
+    for key in ('J_fwd', 'J_bwd', 'J_net', 'J_sym', 'Leak'):
         assert key in result, f"missing key '{key}'"
         assert result[key].shape == (nx - 1,), (
             f"{key}: expected shape ({nx-1},), got {result[key].shape}")
@@ -95,4 +93,3 @@ def test_flux1d_3d_derived_quantities():
     r = information_flux_1d(data, dt=1.0, tau=1, k=5)
     np.testing.assert_allclose(r['J_net'], r['J_fwd'] - r['J_bwd'])
     np.testing.assert_allclose(r['J_sym'], 0.5 * (r['J_fwd'] + r['J_bwd']))
-    np.testing.assert_allclose(r['Leak_fwd'], r['Leak_bwd'])
