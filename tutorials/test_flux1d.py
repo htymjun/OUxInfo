@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from ouxinfo import information_flux_1d
+from ouxinfo import information_flow_1d
 
 
 plt.rcParams['font.family'] = 'Times New Roman'
@@ -29,7 +29,7 @@ for t in range(nt):
 data = data[:, 1:]  # shape (nx, nt)
 
 # --- compute 1D information flux -------------------------------------------
-result = information_flux_1d(data, dt=1.e0, tau=1, k=5, n_jobs=4)
+result = information_flow_1d(data, dt=1.e0, tau=1, k=5, n_jobs=4)
 
 # interface positions i + 1/2
 x_iface = np.arange(nx - 1) + 0.5e0

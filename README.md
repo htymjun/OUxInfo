@@ -92,3 +92,10 @@ Used for Python bindings.
 
 ### NumPy, SciPy, Matplotlib, Numba
 These libraries are installed via pip and are subject to their respective licenses.
+
+## AI-Assisted Development
+Development during 2025 was primarily conducted by the project owners.  
+Starting in 2026, the project expanded its contributor base and introduced AI-assisted "vibe coding" workflows using Claude Code.
+
+To maintain transparency, we aim to clearly distinguish which parts of the codebase and development workflow involve AI-generated content or AI-assisted modifications. In addition, as part of our effort to share practical knowledge on AI-assisted development in the community, we provide Claude Code plan files under `./docs/plans`.
+
