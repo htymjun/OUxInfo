@@ -1,3 +1,6 @@
+import os
+import platform
+import sys
 from setuptools import setup, Extension
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 from pathlib import Path
@@ -7,12 +10,37 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 
+def _target_machine():
+    # cibuildwheel sets ARCHFLAGS on macOS for cross-compilation
+    archflags = os.environ.get("ARCHFLAGS", "")
+    if "arm64" in archflags:
+        return "arm64"
+    if "x86_64" in archflags:
+        return "x86_64"
+    return platform.machine().lower()
+
+
 class CustomBuildExt(build_ext):
   def build_extensions(self):
-    opts = ["-Ofast", "-mfma", "-fopenmp", "-std=c++14", "-fPIC"]
+    machine = _target_machine()
+
+    if sys.platform == "win32":
+      compile_args = ["/O2", "/openmp", "/std:c++14"]
+      link_args = []
+    elif sys.platform == "darwin":
+      compile_args = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]
+      link_args = ["-fopenmp"]
+      if machine == "x86_64":
+        compile_args.insert(1, "-mfma")
+    else:  # Linux
+      compile_args = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]
+      link_args = ["-fopenmp"]
+      if machine in ("x86_64", "i686"):
+        compile_args.insert(1, "-mfma")
+
     for ext in self.extensions:
-      ext.extra_compile_args = opts
-      ext.extra_link_args    = ["-fopenmp"]
+      ext.extra_compile_args = compile_args
+      ext.extra_link_args    = link_args
     super().build_extensions()
 
 ext_modules = [
@@ -21,7 +49,6 @@ ext_modules = [
     ["ouxinfo/ouxinfo.cpp"],
     include_dirs=["ouxinfo", "third_party"],
     cxx_std=14,
-    extra_compile_args=["-Ofast", "-mfma", "-fopenmp"],
   ),
 ]
 
