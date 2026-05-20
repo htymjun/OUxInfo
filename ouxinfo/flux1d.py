@@ -93,7 +93,7 @@ def information_flow_1d(data, dt=1.0, tau=1, k=5, n_jobs=1):
         Time delay. Default 1.
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
-    n_threads : int, optional
+    n_jobs : int, optional
         OpenMP thread count forwarded to information_flow_causal_map. Default 1.
     Returns
     -------
@@ -150,7 +150,7 @@ def information_flow_1d(data, dt=1.0, tau=1, k=5, n_jobs=1):
     }
 
 
-def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1):
+def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1, x1=None, x2=None):
     """
     Compute directed information flux across interfaces of a 2D spatial grid.
     For each neighboring cell interface i+½ and j+½, evaluates both directional
@@ -166,7 +166,7 @@ def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1):
         Time delay. Default 1.
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
-    n_threads : int, optional
+    n_jobs : int, optional
         OpenMP thread count forwarded to information_flow_causal_map. Default 1.
     Returns
     -------
@@ -246,16 +246,32 @@ def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1):
       Jy_bwd /= nz
       Leaky  /= nz
     ################################################################
-    return {
-      'Jx_fwd': Jx_fwd,
-      'Jx_bwd': Jx_bwd,
-      'Jx_net': Jx_fwd - Jx_bwd,
-      'Jx_sym': 0.5 * (Jx_fwd + Jx_bwd),
-      'Leakx' : Leakx,
-      'Jy_fwd': Jy_fwd,
-      'Jy_bwd': Jy_bwd,
-      'Jy_net': Jy_fwd - Jy_bwd,
-      'Jy_sym': 0.5 * (Jy_fwd + Jy_bwd),
-      'Leaky' : Leaky,
-    }
+    if x1 is None or x2 is None:
+      return {
+        'Jx_fwd': Jx_fwd,
+        'Jx_bwd': Jx_bwd,
+        'Jx_net': Jx_fwd - Jx_bwd,
+        'Jx_sym': 0.5 * (Jx_fwd + Jx_bwd),
+        'Leakx' : Leakx,
+        'Jy_fwd': Jy_fwd,
+        'Jy_bwd': Jy_bwd,
+        'Jy_net': Jy_fwd - Jy_bwd,
+        'Jy_sym': 0.5 * (Jy_fwd + Jy_bwd),
+        'Leaky' : Leaky,
+      }
+    else:
+      return {
+        'Jx_fwd': Jx_fwd,
+        'Jx_bwd': Jx_bwd,
+        'Jx_net': Jx_fwd - Jx_bwd,
+        'Jx_sym': 0.5 * (Jx_fwd + Jx_bwd),
+        'Leakx' : Leakx,
+        'Jy_fwd': Jy_fwd,
+        'Jy_bwd': Jy_bwd,
+        'Jy_net': Jy_fwd - Jy_bwd,
+        'Jy_sym': 0.5 * (Jy_fwd + Jy_bwd),
+        'Leaky' : Leaky,
+        'x1'    : x1,
+        'x2'    : x2,
+      }
 
