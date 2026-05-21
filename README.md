@@ -93,6 +93,11 @@ Used for Python bindings.
 ### NumPy, SciPy, Matplotlib, Numba
 These libraries are installed via pip and are subject to their respective licenses.
 
+## Validation Dataset Acknowledgement
+The validation dataset included in this repository is based on data provided by:
+[SURD](https://github.com/ALD-Lab/SURD)
+We gratefully acknowledge the authors for making the dataset publicly available under the MIT License.
+
 ## AI-Assisted Development
 Development during 2025 was primarily conducted by the project owners.  
 Starting in 2026, the project expanded its contributor base and introduced AI-assisted "vibe coding" workflows using Claude Code.
