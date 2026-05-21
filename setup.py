@@ -66,7 +66,6 @@ setup(
   zip_safe=False,
   python_requires=">=3.10",
   install_requires=[
-    'pybind11',
     'numpy',
     'matplotlib',
     'scipy',
