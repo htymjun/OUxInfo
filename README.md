@@ -33,7 +33,8 @@ $ pip install .
 * numpy
 * scipy
 * matplotlib
-* numba
+* joblib
+* tqdm
 
 #### C++ dependencies
 * Boost C++ Libraries (Boost Software License, included in this repository)
