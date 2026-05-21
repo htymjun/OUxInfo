@@ -1,0 +1,59 @@
+{% set name = "ouxinfo" %}
+{% set version = "0.1.4" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 5accefb4722581f6eee7330739e25bedb4f549a684542c89e828e3c9c6a9055f
+
+build:
+  number: 0
+  skip: true  # [py<310]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}   # requires GCC >= 13; uses -Ofast, -fopenmp, C++14
+    - {{ stdlib("c") }}
+    - llvm-openmp  # [osx]
+    - libgomp      # [linux]
+  host:
+    - python
+    - pip
+    - setuptools
+    - pybind11
+  run:
+    - python
+    - numpy
+    - matplotlib-base
+    - scipy
+    - tqdm
+    - joblib
+
+test:
+  imports:
+    - ouxinfo
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/htymjun/OUxInfo
+  summary: Fast Shannon entropy estimator for causal inference in dynamical systems
+  description: |
+    OUxInfo is a high-performance Shannon entropy estimator for Python with a C++
+    backend. It implements k-nearest-neighbor (KSG/Kozachenko-Leonenko) algorithms
+    with a Chebyshev-metric k-d tree and OpenMP parallelization. Designed for
+    information-theoretic causal inference: transfer entropy, mutual information,
+    information flow, and KL divergence.
+  license: MIT
+  license_file: LICENSE
+  doc_url: https://github.com/htymjun/OUxInfo
+  dev_url: https://github.com/htymjun/OUxInfo
+
+extra:
+  recipe-maintainers:
+    - htymjun
