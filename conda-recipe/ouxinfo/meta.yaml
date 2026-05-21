@@ -8,6 +8,8 @@ package:
 source:
   url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
   sha256: 5accefb4722581f6eee7330739e25bedb4f549a684542c89e828e3c9c6a9055f
+  patches:
+    - remove-unused-install-requires.patch
 
 build:
   number: 0
@@ -16,7 +18,6 @@ build:
 requirements:
   build:
     - {{ compiler('cxx') }}   # requires GCC >= 13; uses -Ofast, -fopenmp, C++14
-    - {{ stdlib("c") }}
     - llvm-openmp  # [osx]
     - libgomp      # [linux]
   host:
@@ -24,6 +25,8 @@ requirements:
     - pip
     - setuptools
     - pybind11
+    - llvm-openmp  # [osx]
+    - libgomp      # [linux]
   run:
     - python
     - numpy
@@ -31,6 +34,8 @@ requirements:
     - scipy
     - tqdm
     - joblib
+    - llvm-openmp  # [osx]
+    - libgomp      # [linux]
 
 test:
   imports:

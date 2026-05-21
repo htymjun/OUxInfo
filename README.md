@@ -13,7 +13,7 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 
 ## Installation
 ### Requirements
-* Python >= 3.12 (3.13 recommended)
+* Python >= 3.10 (3.12 recommended)
 * GCC >= 11 (>= 13 recommended)
 * OpenMP support (-fopenmp)
 
@@ -33,7 +33,8 @@ $ pip install .
 * numpy
 * scipy
 * matplotlib
-* numba
+* joblib
+* tqdm
 
 #### C++ dependencies
 * Boost C++ Libraries (Boost Software License, included in this repository)
@@ -92,6 +93,11 @@ Used for Python bindings.
 
 ### NumPy, SciPy, Matplotlib, Numba
 These libraries are installed via pip and are subject to their respective licenses.
+
+## Validation Dataset Acknowledgement
+The validation dataset included in this repository is based on data provided by:
+[SURD](https://github.com/ALD-Lab/SURD)
+We gratefully acknowledge the authors for making the dataset publicly available under the MIT License.
 
 ## AI-Assisted Development
 Development during 2025 was primarily conducted by the project owners.  
