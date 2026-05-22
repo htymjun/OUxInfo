@@ -1,8 +1,8 @@
 site_name: OUxInfo
-site_description: High-performance Shannon entropy and information-theoretic estimators for Python
-site_url: https://htymjun.github.io/ShannonEntropyEstimator/
-repo_url: https://github.com/htymjun/ShannonEntropyEstimator
-repo_name: htymjun/ShannonEntropyEstimator
+site_description: A Python package powered by a C++ backend for Shannon entropy estimator for causal inference.
+site_url: https://htymjun.github.io/OUxInfo/
+repo_url: https://github.com/htymjun/OUxInfo
+repo_name: htymjun/OUxInfo
 
 theme:
   name: material
@@ -59,6 +59,9 @@ extra_javascript:
 
 extra_css:
   - css/extra.css
+
+exclude_docs: |
+  plans/
 
 nav:
   - Home: index.md
