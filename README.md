@@ -1,6 +1,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/ouxinfo.svg)](https://pypi.org/project/ouxinfo/)
 [![Downloads](https://img.shields.io/pypi/dm/ouxinfo)](https://pypi.org/project/ouxinfo/)
 [![DOI](https://zenodo.org/badge/1057221883.svg)](https://doi.org/10.5281/zenodo.19303016)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://htymjun.github.io/OUxInfo/)
 
 # OUxInfo
 OUxInfo is a high-performance Shannon entropy estimator for Python, powered by a C++ backend.
