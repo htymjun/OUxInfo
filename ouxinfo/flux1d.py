@@ -94,7 +94,7 @@ def information_flow_1d(data, dt=1.0, tau=1, k=5, n_jobs=1):
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
     n_jobs : int, optional
-        OpenMP thread count forwarded to information_flow_causal_map. Default 1.
+        Number of parallel jobs (joblib). Default 1.
     Returns
     -------
     dict
@@ -167,7 +167,7 @@ def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1, x1=None, x2=None):
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
     n_jobs : int, optional
-        OpenMP thread count forwarded to information_flow_causal_map. Default 1.
+        Number of parallel jobs (joblib). Default 1.
     Returns
     -------
     dict

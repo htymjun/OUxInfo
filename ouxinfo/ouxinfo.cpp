@@ -507,32 +507,213 @@ py::array_t<double> information_flow_causal_map_wrapper(
 // pybind11 module
 // ============================================================
 PYBIND11_MODULE(_core, m) {
-  m.doc() = "Shannon entropy using nanoflann + Boost digamma";
+  m.doc() = "High-performance Shannon entropy and information-theoretic estimators (C++ backend).";
   m.def("shannon_entropy", &shannon_entropy_wrapper,
         py::arg("X"), py::arg("k")=5,
-        "Compute Shannon entropy of dataset X using Kozachenko-Leonenko estimator");
+        R"doc(Compute Shannon entropy using the Kozachenko-Leonenko estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim)
+    Input data. Must be float64.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+
+Returns
+-------
+float
+    Shannon entropy in nats.
+
+Notes
+-----
+Uses the Kozachenko-Leonenko k-NN estimator with Chebyshev metric.
+See: Kozachenko & Leonenko (1987), Kraskov et al. (2004).
+)doc");
   m.def("KL_div", &KL_div_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=5,
-        "Compute Kullback-Leibler divergence of dataset X and Y using Pérez-Cruz");
+        R"doc(Compute Kullback-Leibler divergence using the Pérez-Cruz estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim)
+    Samples from distribution P. Must be float64.
+Y : ndarray of shape (M, dim)
+    Samples from distribution Q. Must be float64.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+
+Returns
+-------
+float
+    KL divergence D_KL(P || Q) in nats.
+
+Notes
+-----
+Uses the k-NN estimator of Pérez-Cruz (2008).
+)doc");
   m.def("mutual_info", &mutual_info_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("k")=5, py::arg("Thei")=0,
-        "Compute mutual information of dataset X and Y using Kraskov's estimator type 1");
+        R"doc(Compute mutual information using the Kraskov-Stögbauer-Grassberger (KSG) estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim_x)
+    First dataset. Must be float64.
+Y : ndarray of shape (N, dim_y)
+    Second dataset. Must be float64.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+Thei : int, optional
+    Length of Theiler window to exclude temporal neighbors. Default 0.
+
+Returns
+-------
+float
+    Mutual information I(X; Y) in nats.
+
+Notes
+-----
+Uses KSG estimator type 1. See: Kraskov et al. (2004).
+)doc");
   m.def("conditional_mutual_info", &conditional_mutual_info_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("Z"), py::arg("k")=5,
-        "Compute conditional mutual information of dataset X, Y, and Z using Kraskov's estimator type 1");
+        R"doc(Compute conditional mutual information using the KSG estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim_x)
+    First dataset. Must be float64.
+Y : ndarray of shape (N, dim_y)
+    Second dataset. Must be float64.
+Z : ndarray of shape (N, dim_z)
+    Conditioning dataset. Must be float64.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+
+Returns
+-------
+float
+    Conditional mutual information I(X; Y | Z) in nats.
+
+Notes
+-----
+Uses KSG estimator type 1. See: Kraskov et al. (2004).
+)doc");
   m.def("transfer_entropy", &transfer_entropy_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("m")=1, py::arg("lag")=1,
         py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0,
-        "Compute transfer entropy of dataset X and Y using Kraskov's estimator type 1");
+        R"doc(Compute transfer entropy from X to Y using the KSG estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim)
+    Source time series. Must be float64.
+Y : ndarray of shape (N, dim)
+    Target time series. Must be float64.
+tau : int, optional
+    Time delay (in samples). Default 1.
+m : int, optional
+    Embedding dimension for Y. Default 1.
+lag : int, optional
+    Time lag for embedding. Default 1.
+dt : float, optional
+    Physical time step. Default 1.0.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+trial : int, optional
+    Number of surrogate trials for significance testing. Default 0.
+
+Returns
+-------
+float
+    Transfer entropy TE(X -> Y) in nats per dt.
+
+Notes
+-----
+Computed as conditional mutual information: TE = I(Y_{t+tau}; X_t^(m) | Y_t^(m)).
+See: Schreiber (2000), Kraskov et al. (2004).
+)doc");
   m.def("information_flow", &information_flow_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("dt")=1.e0, py::arg("k")=5,
-        "Compute information flow of dataset X and Y using Kraskov's estimator type 1");
+        R"doc(Compute information flow from X to Y using the KSG estimator.
+
+Parameters
+----------
+X : ndarray of shape (N, dim)
+    Source time series. Must be float64.
+Y : ndarray of shape (N, dim)
+    Target time series. Must be float64.
+tau : int, optional
+    Time delay (in samples). Default 1.
+dt : float, optional
+    Physical time step. Default 1.0.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+
+Returns
+-------
+float
+    Information flow dI_X (rate of mutual information change due to X) in nats per dt.
+
+Notes
+-----
+Based on the decomposition dI/dt = dI_X + dI_Y + Leak.
+See: Horowitz & Esposito (2014).
+)doc");
   m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
         py::arg("X"), py::arg("tau"), py::arg("m")=1, py::arg("lag")=1,
         py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
-        "Compute causal map based on transfer entropy");
+        R"doc(Compute a transfer entropy causal map for multivariate time series.
+
+Parameters
+----------
+X : ndarray of shape (N, Nt) or (N, Nt, dim)
+    Multivariate time series with N variables and Nt time steps.
+    Must be float64.
+tau : ndarray of shape (N,), dtype int32
+    Time delay for each variable.
+m : int, optional
+    Embedding dimension. Default 1.
+lag : int, optional
+    Time lag for embedding. Default 1.
+dt : float, optional
+    Physical time step. Default 1.0.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+trial : int, optional
+    Number of surrogate trials. Default 0.
+n_threads : int, optional
+    Number of OpenMP threads. Default 1.
+
+Returns
+-------
+ndarray of shape (N, N)
+    Causal map where entry [i, j] is TE(X_j -> X_i).
+)doc");
   m.def("information_flow_causal_map", &information_flow_causal_map_wrapper,
         py::arg("X"), py::arg("tau"), py::arg("dt")=1.e0, py::arg("k")=5, py::arg("n_threads")=1,
-        "Compute causal map based on information flow");
+        R"doc(Compute an information flow causal map for multivariate time series.
+
+Parameters
+----------
+X : ndarray of shape (N, Nt) or (N, Nt, dim)
+    Multivariate time series with N variables and Nt time steps.
+    Must be float64.
+tau : ndarray of shape (N,), dtype int32
+    Time delay for each variable.
+dt : float, optional
+    Physical time step. Default 1.0.
+k : int, optional
+    Number of nearest neighbors. Default 5.
+n_threads : int, optional
+    Number of OpenMP threads. Default 1.
+
+Returns
+-------
+tuple of three ndarray, each of shape (N, N)
+    (IF_map, Leak_map, dI_map) where IF_map[i, j] is the information flow
+    from X_j to X_i, Leak_map[i, j] is the associated leak, and dI_map[i, j]
+    is the mutual information rate.
+)doc");
 }
 

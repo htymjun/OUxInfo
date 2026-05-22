@@ -8,34 +8,41 @@ from .backwardTE import backward_transfer_entropy
 
 
 def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, result_dir='.', multi=False):
-  '''
+  """Compute transfer entropy, information flow, and leak for a multivariate time series.
+
+  Computes single-step transfer entropy (sTE), optionally multi-step TE (mTE) and
+  backward TE (bTE), plus information flow (IF), Leak, and dI. Saves results as a
+  compressed ``.npz`` file in ``result_dir``.
+
   Parameters
   ----------
-  X          : ndarray (N, Nt, dim)
-               N: number of variables
-               Nt: length of time series
-               dim: dimension of physical quantities (optional)
-  tau        : int, optional
-               Length of time delay
-  dt         : double, optional
-               Physical time
-  lag        : int, optional
-               Time lag for embedding
-  max_m      : int, optional
-               Maximum embedding dimension
-  tol        : int, optional
-               Tolerance for mTE calculation
-  k          : int, optional
-               Number of nearest neighbors.
-  n_threads  : int, optional
-               The number of trials for surrogate analysis.
+  X : ndarray of shape (N, Nt) or (N, Nt, dim)
+      Multivariate time series. N variables, Nt time steps, optional dim dimensions.
+  tau : int, optional
+      Time delay (in samples). Default 1.
+  dt : float, optional
+      Physical time step. Default 1.0.
+  lag : int, optional
+      Time lag for embedding. Default 1.
+  max_m : int, optional
+      Maximum embedding dimension for mTE. Default 10.
+  tol : float, optional
+      Convergence tolerance for mTE calculation. Default 0.01.
+  k : int, optional
+      Number of nearest neighbors. Default 5.
+  n_threads : int, optional
+      Number of OpenMP threads for causal map computation. Default 1.
   result_dir : str, optional
-               The path of directory to save result.
+      Directory to save the result file. Default '.'.
+  multi : bool, optional
+      If True, also compute mTE and bTE. Default False.
+
   Returns
   -------
-  numpy binary
-    Saves results to a compressed file in result_dir.
-  '''
+  None
+      Saves ``teifl.npz`` in ``result_dir`` containing sTE, IF, Leak, dI,
+      and optionally mTE, bTE, mmap.
+  """
   # Transfer Entropy, Information Flow, Leak
   # sTE > mTE > IF
   # error check
@@ -100,18 +107,20 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
 
 
 def plot_TEIFL(file_path, labels):
-  '''
+  """Plot causal maps from TEIFL output and save as PNG files.
+
   Parameters
   ----------
   file_path : str
-              The path of directory to load result.
-  labels    : str
-              The labels for plot causal maps.
+      Path to the ``teifl.npz`` file produced by :func:`TEIFL`.
+  labels : list of str
+      Variable labels used for axis annotation.
+
   Returns
   -------
-  numpy binary
-    Saves results in result_dir.
-  '''
+  None
+      Saves PNG figures in the same directory as ``file_path``.
+  """
   result_dir = os.path.dirname(file_path)
   teifl = np.load(file_path)
   if 'mTE' in teifl:

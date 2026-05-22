@@ -8,6 +8,7 @@ experiments/
 build/
 dist/
 *.egg-info/
+site/
 
 # wheel unpack
 wheel_contents/
