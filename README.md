@@ -41,7 +41,7 @@ $ pip install .
 * nanoflann (BSD License, included in this repository)
 
 ## Usage (example)
-~~~bash
+~~~python
 import numpy as np
 from ouxinfo import shannon_entropy
 
