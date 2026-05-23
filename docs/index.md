@@ -12,7 +12,7 @@ It provides non-parametric k-nearest-neighbor (KSG/Kozachenko-Leonenko) estimato
 - Shannon entropy, KL divergence, mutual information, conditional mutual information
 - Transfer entropy and backward transfer entropy
 - Information flow and causal maps
-- Directed spatial information flux (1D and 2D)
+- Directed spatial information flow (1D and 2D)
 
 The C++ core uses [nanoflann](https://github.com/jlblancoc/nanoflann) for fast k-d tree queries and [OpenMP](https://www.openmp.org/) for parallelism, making it suitable for large datasets and multivariate analyses.
 
@@ -48,11 +48,11 @@ print(f"TE(y -> x) = {TE:.4f} nats/step")
 
 | Feature | Description |
 |---|---|
-| **KSG estimators** | Bias-corrected k-NN estimators for entropy, MI, CMI, KL divergence |
+| **KSG estimators** | k-NN estimators for entropy, MI, CMI, KL divergence |
 | **Transfer entropy** | Forward and backward TE with surrogate testing |
 | **Information flow** | Horowitz-Esposito rate decomposition (IF, Leak, dI) |
 | **Causal maps** | Pairwise TE and IF maps for multivariate systems |
-| **Spatial flux** | Directed information flux across 1D/2D spatial grids |
+| **Spatial flow** | Directed information flow across 1D/2D spatial grids |
 | **TEIFL** | All-in-one analysis: sTE, mTE, bTE, IF, Leak, dI |
 | **OpenMP** | Parallelized causal map computation |
 
@@ -74,31 +74,8 @@ $$TE_{Y \to X} = I\!\left(X_{t+\tau};\, Y_t^{(m)} \mid X_t^{(m)}\right)$$
 
 $$\frac{d}{dt}I(X_t; Y_t) = \dot{I}_X(t) + \dot{I}_Y(t) + \text{Leak}$$
 
-See the [Theory](theory.md) page for complete derivations and references.
-
 ---
 
-## Related Publication
-
-This library was used in:
-
-> Jun Hatayama, Kento Tanaka, and Toshinori Kouchi.
-> *Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory.*
-> **Computers & Fluids** (2026): 107016.
-
-```bibtex
-@article{hatayama2026nonlinear,
-  title={Nonlinear causal relationship between separation bubbles and reflected shock wave
-         in shock wave/turbulent boundary layer interaction based on information theory},
-  author={Hatayama, Jun and Tanaka, Kento and Kouchi, Toshinori},
-  journal={Computers \& Fluids},
-  pages={107016},
-  year={2026},
-  publisher={Elsevier}
-}
-```
-
----
 
 ## License
 

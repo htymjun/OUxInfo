@@ -9,6 +9,11 @@ Boost is now bundled in the `third_party/` directory. You do not need to install
 
 ## Install via pip
 ```bash
+pip install ouxinfo
+```
+
+## Install locally
+```bash
 pip install .
 ```
 
@@ -18,7 +23,8 @@ These are installed automatically via pip:
 - numpy
 - scipy
 - matplotlib
-- numba
+- joblib
+- tqdm
 
 ## C++ dependencies
 - Boost (bundled in `third_party/`)
