@@ -1,5 +1,6 @@
 import os
 import platform
+import re
 import sys
 from setuptools import setup, Extension
 from pybind11.setup_helpers import Pybind11Extension, build_ext
@@ -8,6 +9,11 @@ from pathlib import Path
 
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text(encoding="utf-8")
+
+
+def _get_version():
+    text = (this_directory / "ouxinfo" / "_version.py").read_text()
+    return re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text).group(1)
 
 
 def _target_machine():
@@ -55,7 +61,7 @@ ext_modules = [
 
 setup(
   name="ouxinfo",
-  version="0.1.4",
+  version=_get_version(),
   packages=["ouxinfo"],
   description="Fast Shannon entropy estimator using C++",
   long_description=long_description,
