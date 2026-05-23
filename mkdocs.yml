@@ -35,7 +35,7 @@ plugins:
           options:
             docstring_style: numpy
             show_source: false
-            show_signature_annotations: true
+            show_signature_annotations: false
             show_root_heading: true
             heading_level: 3
             members_order: source
@@ -66,5 +66,4 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Installation: install.md
-  - Theory: theory.md
   - API Reference: api.md

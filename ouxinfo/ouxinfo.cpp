@@ -508,6 +508,10 @@ py::array_t<double> information_flow_causal_map_wrapper(
 // ============================================================
 PYBIND11_MODULE(_core, m) {
   m.doc() = "High-performance Shannon entropy and information-theoretic estimators (C++ backend).";
+
+  py::options options;
+  options.disable_function_signatures();
+
   m.def("shannon_entropy", &shannon_entropy_wrapper,
         py::arg("X"), py::arg("k")=5,
         R"doc(Compute Shannon entropy using the Kozachenko-Leonenko estimator.
@@ -521,7 +525,7 @@ k : int, optional
 
 Returns
 -------
-float
+value : float
     Shannon entropy in nats.
 
 Notes
@@ -536,16 +540,16 @@ See: Kozachenko & Leonenko (1987), Kraskov et al. (2004).
 Parameters
 ----------
 X : ndarray of shape (N, dim)
-    Samples from distribution P. Must be float64.
+    Samples from distribution X. Must be float64.
 Y : ndarray of shape (M, dim)
-    Samples from distribution Q. Must be float64.
+    Samples from distribution Y. Must be float64.
 k : int, optional
     Number of nearest neighbors. Default 5.
 
 Returns
 -------
-float
-    KL divergence D_KL(P || Q) in nats.
+value : float
+    KL divergence D_KL(X || Y) in nats.
 
 Notes
 -----
@@ -568,7 +572,7 @@ Thei : int, optional
 
 Returns
 -------
-float
+value : float
     Mutual information I(X; Y) in nats.
 
 Notes
@@ -592,7 +596,7 @@ k : int, optional
 
 Returns
 -------
-float
+value : float
     Conditional mutual information I(X; Y | Z) in nats.
 
 Notes
@@ -625,7 +629,7 @@ trial : int, optional
 
 Returns
 -------
-float
+value : float
     Transfer entropy TE(X -> Y) in nats per dt.
 
 Notes
@@ -652,12 +656,15 @@ k : int, optional
 
 Returns
 -------
-float
+value : float
     Information flow dI_X (rate of mutual information change due to X) in nats per dt.
 
 Notes
 -----
-Based on the decomposition dI/dt = dI_X + dI_Y + Leak.
+Based on the decomposition
+
+    dI/dt = dI_X + dI_Y + Leak
+
 See: Horowitz & Esposito (2014).
 )doc");
   m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
@@ -687,7 +694,7 @@ n_threads : int, optional
 
 Returns
 -------
-ndarray of shape (N, N)
+value : ndarray of shape (N, N)
     Causal map where entry [i, j] is TE(X_j -> X_i).
 )doc");
   m.def("information_flow_causal_map", &information_flow_causal_map_wrapper,
@@ -710,7 +717,7 @@ n_threads : int, optional
 
 Returns
 -------
-tuple of three ndarray, each of shape (N, N)
+value : tuple of three ndarray, each of shape (N, N)
     (IF_map, Leak_map, dI_map) where IF_map[i, j] is the information flow
     from X_j to X_i, Leak_map[i, j] is the associated leak, and dI_map[i, j]
     is the mutual information rate.
