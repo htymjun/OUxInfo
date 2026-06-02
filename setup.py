@@ -31,7 +31,7 @@ class CustomBuildExt(build_ext):
     machine = _target_machine()
 
     if sys.platform == "win32":
-      compile_args = ["/O2", "/openmp", "/std:c++14"]
+      compile_args = ["/O2", "/std:c++14"]
       link_args = []
     elif sys.platform == "darwin":
       compile_args = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]

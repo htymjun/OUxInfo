@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from ouxinfo import information_flux
+from ouxinfo import information_flow
 
 
 @njit(cache=True, nogil=True)
@@ -24,8 +24,8 @@ def test_coupling_system(nt, n, byx, x0, y0, trial):
   for j in tqdm(range(n)):
     for i in range(trial):
       x, y = coupling_system(nt, x0, y0, bxy[j], byx)
-      IFxy[j] += information_flux(x.reshape(-1,1), y.reshape(-1,1), k=5, tau=1)
-      IFyx[j] += information_flux(y.reshape(-1,1), x.reshape(-1,1), k=5, tau=1)
+      IFxy[j] += information_flow(x.reshape(-1,1), y.reshape(-1,1), k=5, tau=1)
+      IFyx[j] += information_flow(y.reshape(-1,1), x.reshape(-1,1), k=5, tau=1)
     IFxy[j] /= trial
     IFyx[j] /= trial
   plt.figure(figsize=(6,6))
