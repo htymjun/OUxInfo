@@ -3,7 +3,11 @@
 [![DOI](https://zenodo.org/badge/1057221883.svg)](https://doi.org/10.5281/zenodo.19303016)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://htymjun.github.io/OUxInfo/)
 
-# OUxInfo
+
+<p align="center">
+  <img src="docs/img/OUxInfo.png" alt="OUxInfo" width="600">
+</p>
+
 OUxInfo is a high-performance Shannon entropy estimator for Python, powered by a C++ backend.
 It is designed for fast and scalable entropy estimation, particularly for causal inference.
 

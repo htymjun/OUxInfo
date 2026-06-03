@@ -1,3 +1,21 @@
+/* Logo palette: dark charcoal nav, champagne accent */
+:root {
+  --md-primary-fg-color:        #1c1a18;
+  --md-primary-fg-color--light: #2a2826;
+  --md-primary-fg-color--dark:  #0f0d0b;
+  --md-primary-bg-color:        #d4c5a0;
+  --md-primary-bg-color--light: rgba(212, 197, 160, 0.7);
+  --md-accent-fg-color:              #d4c5a0;
+  --md-accent-fg-color--transparent: rgba(212, 197, 160, 0.1);
+  --md-accent-bg-color:         #1c1a18;
+}
+
+/* Light scheme: darken champagne so links are readable on white */
+[data-md-color-scheme="default"] {
+  --md-accent-fg-color: #8b7355;
+  --md-typeset-a-color: #8b7355;
+}
+
 .md-typeset .highlight code {
   font-size: 0.85em;
 }
