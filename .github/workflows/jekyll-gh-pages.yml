@@ -39,6 +39,12 @@ jobs:
         run: |
           pip install setuptools pybind11
           pip install -e .
+      - name: Install pytest
+        run: pip install pytest
+      - name: Generate validation images
+        run: pytest tests/ -v
+      - name: Copy validation images to docs
+        run: cp -r tests/results docs/results
       - name: Install MkDocs
         run: pip install mkdocs mkdocs-material mkdocstrings[python] pymdown-extensions
       - name: Build docs
