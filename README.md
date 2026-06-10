@@ -5,7 +5,7 @@
 
 
 <p align="center">
-  <img src="docs/img/OUxInfo.png" alt="OUxInfo" width="600">
+  <img src="docs/img/OUxInfo.png" alt="OUxInfo">
 </p>
 
 OUxInfo is a high-performance Shannon entropy estimator for Python, powered by a C++ backend.
