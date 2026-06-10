@@ -10,7 +10,7 @@
 #include "shannon_entropy.hpp"
 #include "kullback_leibler_divergence.hpp"
 #include "mutual_information.hpp"
-#include "information_flow.hpp"
+#include "information_flow.cpp"
 
 
 namespace py = pybind11;
@@ -405,282 +405,6 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
 }
 
 
-py::array_t<double> information_flow_causal_map_wrapper(
-  py::array_t<double, py::array::c_style> X_obj,
-  py::array_t<int,    py::array::c_style> tau_obj,
-  double dt=1.e0, int k=5, int n_threads=1){
-  /*
-  Parameters
-  ----------
-  X         : ndarray (N, Nt) or (N, Nt, dim)
-  tau       : ndarray (N)
-              Length of time delay
-  dt        : double, optional
-              Physical time
-  k         : int, optional
-              Number of nearest neighbors.
-  n_threads : int, optional
-              The number of threads used for OpenMP.
-  Returns
-  -------
-  double
-    information flow causal map.
-  */
-  py::buffer_info info     = X_obj.request();
-  py::buffer_info info_tau = tau_obj.request();
-  // error messages
-  if (info.ndim != 2 && info.ndim != 3)
-    throw std::runtime_error("X must be 2D (N, Nt) or 3D (N, Nt, dx)");
-  if (info_tau.ndim != 1)
-    throw std::runtime_error("tau must be 1D (N)");
-  if (info.itemsize != sizeof(double))
-    throw std::runtime_error("X must be float64");
-  if (info_tau.itemsize != sizeof(int))
-    throw std::runtime_error("tau must be int32");
-  // main
-  int N  = static_cast<int>(info.shape[0]);
-  int Nt = static_cast<int>(info.shape[1]);
-  int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
-  if (info_tau.shape[0] != N)
-    throw std::runtime_error("tau length must equal N");
-  // pointer
-  double *X = static_cast<double*>(info.ptr);
-  int *tau_arr = static_cast<int*>(info_tau.ptr);
-  py::array_t<double>   IF_map({N,N});
-  py::array_t<double>   dI_map({N,N});
-  py::array_t<double> Leak_map({N,N});
-  py::buffer_info info_IF   = IF_map.request();
-  py::buffer_info info_dI   = dI_map.request();
-  py::buffer_info info_Leak = Leak_map.request();
-  double *IF   = static_cast<double*>(info_IF.ptr);
-  double *dI   = static_cast<double*>(info_dI.ptr);
-  double *Leak = static_cast<double*>(info_Leak.ptr);
-  // Enumerate unordered pairs {j,i} with j < i.  Processing each pair together
-  // lets us reuse the base MI(Xi, Xj) for both IF directions and skip a redundant
-  // call when tau_i == tau_j (20% fewer MI calls under uniform-tau configurations).
-  int num_pairs = N * (N - 1) / 2;
-  std::vector<std::pair<int,int>> pairs;
-  pairs.reserve(num_pairs);
-  for (int j = 0; j < N; ++j)
-    for (int i = j + 1; i < N; ++i)
-      pairs.push_back({j, i});
-
-  // Diagonal: NaN
-  for (int v = 0; v < N; ++v)
-    IF[v*N+v] = dI[v*N+v] = Leak[v*N+v] = std::numeric_limits<double>::quiet_NaN();
-
-  // main loop
-  omp_set_num_threads(n_threads);
-  #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < num_pairs; ++p) {
-    int j = pairs[p].first;
-    int i = pairs[p].second;   // i > j
-
-    int tau_i = tau_arr[i];
-    int tau_j = tau_arr[j];
-    double *xi = X + i * Nt * dx;
-    double *xj = X + j * Nt * dx;
-    int Neff_i = Nt - tau_i;
-    int Neff_j = Nt - tau_j;
-
-    if (Neff_i <= 0 || Neff_j <= 0) {
-      IF[j*N+i] = IF[i*N+j] = dI[j*N+i] = dI[i*N+j] =
-        std::numeric_limits<double>::quiet_NaN();
-      continue;
-    }
-
-    // --- Base MI: MI(Xi[:Neff_i], Xj[:Neff_i]) ---
-    // Reused for IF[j,i], dI, and IF[i,j] when tau_i == tau_j.
-    double I_i = mutual_info(&xi, &xj, k, dx, dx, Neff_i);
-
-    // --- IF[j,i]: source i, target j ---
-    double *yi = xj + tau_i * dx;   // Xj shifted by tau_i
-    double Ilag_ji = mutual_info(&xi, &yi, k, dx, dx, Neff_i);
-    IF[j*N+i] = (Ilag_ji - I_i) / dt;
-
-    // --- IF[i,j]: source j, target i ---
-    // MI(Xi,Xj)==MI(Xj,Xi) and Neff equal when tau_i==tau_j, so reuse I_i.
-    double I_j = (tau_i == tau_j) ? I_i : mutual_info(&xj, &xi, k, dx, dx, Neff_j);
-    double *yj = xi + tau_j * dx;   // Xi shifted by tau_j
-    double Ilag_ij = mutual_info(&xj, &yj, k, dx, dx, Neff_j);
-    IF[i*N+j] = (Ilag_ij - I_j) / dt;
-
-    // --- dI[j,i]: MI(Xi[tau_i:], Xj[tau_i:]) ---
-    double *xi_s = xi + tau_i * dx;
-    double *xj_s = xj + tau_i * dx;
-    double Ilag_xy = mutual_info(&xi_s, &xj_s, k, dx, dx, Neff_i);
-    dI[j*N+i] = dI[i*N+j] = (Ilag_xy - I_i) / dt;
-  }
-
-  // Leak: computed after all IF and dI values are available
-  #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < num_pairs; ++p) {
-    int j = pairs[p].first;
-    int i = pairs[p].second;
-    double leak_val = dI[j*N+i] - IF[j*N+i] - IF[i*N+j];
-    Leak[j*N+i] = Leak[i*N+j] = leak_val;
-  }
-
-  return py::make_tuple(IF_map, Leak_map, dI_map);
-}
-
-
-py::object information_flow_causal_map_mask_wrapper(
-  py::array_t<double, py::array::c_style> X_obj,
-  py::object mask_obj,
-  py::array_t<int, py::array::c_style> tau_obj,
-  double dt=1.0, int k=5, int n_threads=1)
-{
-  py::buffer_info info_X = X_obj.request();
-  if (info_X.ndim != 2)
-    throw std::runtime_error("X must be 2D (Nx, Nt)");
-  if (info_X.itemsize != sizeof(double))
-    throw std::runtime_error("X must be float64");
-
-  int Nx = static_cast<int>(info_X.shape[0]);
-  int Nt = static_cast<int>(info_X.shape[1]);
-  double* X = static_cast<double*>(info_X.ptr);
-
-  py::buffer_info info_tau = tau_obj.request();
-  if (info_tau.ndim != 1 || info_tau.shape[0] != Nx)
-    throw std::runtime_error("tau must be 1D with length Nx");
-  if (info_tau.itemsize != sizeof(int))
-    throw std::runtime_error("tau must be int32");
-  int* tau_arr = static_cast<int*>(info_tau.ptr);
-
-  // mask=None → all off-diagonal pairs
-  std::vector<uint8_t> mask_default;
-  bool* mask;
-  py::array_t<bool, py::array::c_style> mask_arr;
-  py::buffer_info info_mask;
-  if (mask_obj.is_none()) {
-    mask_default.assign(Nx * Nx, 1);
-    for (int i = 0; i < Nx; ++i) mask_default[i * Nx + i] = 0;
-    mask = reinterpret_cast<bool*>(mask_default.data());
-  } else {
-    mask_arr  = mask_obj.cast<py::array_t<bool, py::array::c_style>>();
-    info_mask = mask_arr.request();
-    if (info_mask.ndim != 2)
-      throw std::runtime_error("mask must be 2D (Nx, Nx)");
-    if (info_mask.itemsize != sizeof(bool))
-      throw std::runtime_error("mask must be bool");
-    if (info_mask.shape[0] != Nx || info_mask.shape[1] != Nx)
-      throw std::runtime_error("mask must be (Nx, Nx)");
-    mask = static_cast<bool*>(info_mask.ptr);
-  }
-
-  // Allocate three output arrays initialised to 0
-  py::array_t<double>   IF_map({Nx, Nx});
-  py::array_t<double>   dI_map({Nx, Nx});
-  py::array_t<double> Leak_map({Nx, Nx});
-  double* IF   = static_cast<double*>(IF_map.request().ptr);
-  double* dI   = static_cast<double*>(dI_map.request().ptr);
-  double* Leak = static_cast<double*>(Leak_map.request().ptr);
-  std::fill(IF,   IF   + Nx * Nx, 0.0);
-  std::fill(dI,   dI   + Nx * Nx, 0.0);
-  std::fill(Leak, Leak + Nx * Nx, 0.0);
-
-  // Diagonal: NaN (matches full wrapper convention)
-  for (int v = 0; v < Nx; ++v)
-    IF[v*Nx+v] = dI[v*Nx+v] = Leak[v*Nx+v] = std::numeric_limits<double>::quiet_NaN();
-
-  // Collect unique unordered pairs {a, b} with a < b where either mask entry is True
-  std::vector<std::pair<int,int>> pairs;
-  for (int a = 0; a < Nx; ++a)
-    for (int b = a + 1; b < Nx; ++b)
-      if (mask[a * Nx + b] || mask[b * Nx + a])
-        pairs.push_back({a, b});
-
-  omp_set_num_threads(n_threads);
-  #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < (int)pairs.size(); ++p) {
-    int a = pairs[p].first;
-    int b = pairs[p].second;  // b > a — mirrors j < i convention in full wrapper
-
-    int tau_a = tau_arr[a];
-    int tau_b = tau_arr[b];
-    double* xa = X + a * Nt;
-    double* xb = X + b * Nt;
-    int Neff_a = Nt - tau_a;
-    int Neff_b = Nt - tau_b;
-
-    if (Neff_a <= 0 || Neff_b <= 0) {
-      if (mask[a * Nx + b]) IF[a*Nx+b] = dI[a*Nx+b] = Leak[a*Nx+b] = std::numeric_limits<double>::quiet_NaN();
-      if (mask[b * Nx + a]) IF[b*Nx+a] = dI[b*Nx+a] = Leak[b*Nx+a] = std::numeric_limits<double>::quiet_NaN();
-      continue;
-    }
-
-    // Base MI using tau_b (larger-index variable), mirrors I_i in full wrapper
-    double I_b = mutual_info(&xb, &xa, k, 1, 1, Neff_b);
-
-    // IF[a,b]: source = Xb → target = Xa  (mirrors IF[j,i] in full wrapper)
-    double* ya = xa + tau_b;
-    double Ilag_ab = mutual_info(&xb, &ya, k, 1, 1, Neff_b);
-    double if_ab = (Ilag_ab - I_b) / dt;
-
-    // IF[b,a]: source = Xa → target = Xb  (mirrors IF[i,j] in full wrapper)
-    double I_a = (tau_a == tau_b) ? I_b : mutual_info(&xa, &xb, k, 1, 1, Neff_a);
-    double* yb = xb + tau_a;
-    double Ilag_ba = mutual_info(&xa, &yb, k, 1, 1, Neff_a);
-    double if_ba = (Ilag_ba - I_a) / dt;
-
-    // dI: symmetric, uses tau_b (larger-index variable), mirrors dI in full wrapper
-    double* xb_s = xb + tau_b;
-    double* xa_s = xa + tau_b;
-    double Ilag_dI = mutual_info(&xb_s, &xa_s, k, 1, 1, Neff_b);
-    double di_val = (Ilag_dI - I_b) / dt;
-
-    double leak_val = di_val - if_ba - if_ab;
-
-    // Store IF only for masked entries; dI and Leak symmetrically for masked entries
-    if (mask[a * Nx + b]) { IF[a*Nx+b] = if_ab; dI[a*Nx+b] = di_val; Leak[a*Nx+b] = leak_val; }
-    if (mask[b * Nx + a]) { IF[b*Nx+a] = if_ba; dI[b*Nx+a] = di_val; Leak[b*Nx+a] = leak_val; }
-  }
-
-  return py::make_tuple(IF_map, Leak_map, dI_map);
-}
-
-
-// ============================================================
-// Unified dispatcher: routes to full or mask wrapper based on mask argument
-// ============================================================
-py::object information_flow_causal_map_dispatcher(
-    py::array_t<double, py::array::c_style> X_obj,
-    py::object tau_obj,
-    py::object mask_obj,
-    double dt, int k, int n_threads)
-{
-  if (mask_obj.is_none()) {
-    // No mask: full computation (returns tuple of three arrays)
-    // tau may be scalar int or int32 array; broadcast scalar to per-variable array
-    py::array_t<int, py::array::c_style> tau_arr;
-    if (py::isinstance<py::array>(tau_obj)) {
-      tau_arr = tau_obj.cast<py::array_t<int, py::array::c_style>>();
-    } else {
-      int tau_val = tau_obj.cast<int>();
-      int Nx = static_cast<int>(X_obj.request().shape[0]);
-      tau_arr = py::array_t<int>({Nx});
-      auto buf = tau_arr.mutable_unchecked<1>();
-      for (int i = 0; i < Nx; ++i) buf(i) = tau_val;
-    }
-    return information_flow_causal_map_wrapper(X_obj, tau_arr, dt, k, n_threads);
-  } else {
-    // Mask provided: masked computation (returns tuple of three arrays)
-    // tau may be scalar int or int32 array; broadcast scalar to per-variable array
-    py::array_t<int, py::array::c_style> tau_arr;
-    if (py::isinstance<py::array>(tau_obj)) {
-      tau_arr = tau_obj.cast<py::array_t<int, py::array::c_style>>();
-    } else {
-      int tau_val = tau_obj.cast<int>();
-      int Nx = static_cast<int>(X_obj.request().shape[0]);
-      tau_arr = py::array_t<int>({Nx});
-      auto buf = tau_arr.mutable_unchecked<1>();
-      for (int i = 0; i < Nx; ++i) buf(i) = tau_val;
-    }
-    return information_flow_causal_map_mask_wrapper(X_obj, mask_obj, tau_arr, dt, k, n_threads);
-  }
-}
-
 
 // ============================================================
 // pybind11 module
@@ -878,29 +602,25 @@ value : ndarray of shape (N, N)
 )doc");
   m.def("information_flow_causal_map", &information_flow_causal_map_dispatcher,
         py::arg("X"),
-        py::arg("tau")  = py::int_(1),
-        py::arg("mask") = py::none(),
-        py::arg("dt")=1.0, py::arg("k")=5, py::arg("n_threads")=1,
+        py::arg("tau")       = py::int_(1),
+        py::arg("mask")      = py::none(),
+        py::arg("dt")        = 1.0,
+        py::arg("k")         = 5,
+        py::arg("n_threads") = 1,
+        py::arg("full")      = false,
         R"doc(Compute an information flow causal map for multivariate time series.
 
 Two modes depending on whether *mask* is supplied:
 
-**No mask (default)** — full computation returning three maps:
+**No mask (default)** — full or IF-only computation:
   tau : ndarray of shape (N,), dtype int32, or scalar int
       Time delay per variable (scalar is broadcast to all variables).
-  Returns : tuple of three ndarray of shape (N, N)
-      (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i,
-      Leak_map[i, j] = associated leak, dI_map[i, j] = MI rate.
   X may be 2D (N, Nt) or 3D (N, Nt, dim).
 
 **With mask** — compute only the requested pairs:
-  tau  : scalar int.  Time delay in samples.
+  tau  : scalar int or ndarray of shape (N,), dtype int32.
   mask : ndarray of shape (N, N), dtype bool.
       Compute IF only where mask[i, j] is True and i != j.
-      None (default) computes all off-diagonal pairs.
-  Returns : tuple of three ndarray of shape (N, N).
-      (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i;
-      unmasked entries are 0.  Diagonal entries are NaN.
   X must be 2D (N, Nt).
 
 Parameters common to both modes
@@ -913,5 +633,17 @@ k : int, optional
     Number of nearest neighbors. Default 5.
 n_threads : int, optional
     Number of OpenMP threads. Default 1.
+full : bool, optional
+    If False (default), return only IF_map (skips the dI MI call and Leak computation).
+    If True, return a tuple (IF_map, Leak_map, dI_map).
+
+Returns
+-------
+When full=False : ndarray of shape (N, N)
+    IF_map only.  IF_map[i, j] = IF from X_j to X_i.
+    Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
+When full=True : tuple of three ndarray of shape (N, N)
+    (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i.
+    Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
 )doc");
 }

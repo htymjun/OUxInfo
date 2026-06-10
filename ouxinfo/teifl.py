@@ -95,7 +95,7 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   # information flow
   print("calc information flow")
   t_start = time.time()
-  IF, Leak, dI = information_flow_causal_map(X, taus, dt=dt, k=k, n_threads=n_threads)
+  IF, Leak, dI = information_flow_causal_map(X, taus, dt=dt, k=k, n_threads=n_threads, full=True)
   t_end = time.time()
   print("Elapsed time:", t_end - t_start, " [s]")
   os.makedirs(result_dir, exist_ok=True)

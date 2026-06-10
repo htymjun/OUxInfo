@@ -6,7 +6,7 @@ from ._core import information_flow_causal_map
 
 def process_2d(i, data, taus, dt, k_nn):
     pair = np.ascontiguousarray(data[i:i+2, :])
-    IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+    IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
     return i, IF[1, 0], IF[0, 1], Leak[1, 0]
 
 
@@ -16,7 +16,7 @@ def process_3d(k_idx, data, n_ifaces, taus, dt, k_nn):
     leak_k  = np.zeros(n_ifaces)
     for i in range(n_ifaces):
       pair = np.ascontiguousarray(data[k_idx, i:i+2, :])
-      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
       j_fwd_k[i] = IF[1, 0]
       j_bwd_k[i] = IF[0, 1]
       leak_k[i]  = Leak[1, 0] # symmetric Leak[1,0] = Leak[0,1]
@@ -29,7 +29,7 @@ def process_x_3d(j, data, n_ifaces, taus, dt, k_nn):
     leak  = np.zeros(n_ifaces)
     for i in range(n_ifaces):
       pair = np.ascontiguousarray(data[j, i:i+2, :])
-      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
       j_fwd[i] = IF[1, 0]
       j_bwd[i] = IF[0, 1]
       leak[i]  = Leak[1, 0]
@@ -42,7 +42,7 @@ def process_y_3d(i, data, n_jfaces, taus, dt, k_nn):
     leak  = np.zeros(n_jfaces)
     for j in range(n_jfaces):
       pair = np.ascontiguousarray(data[j:j+2, i, :])
-      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+      IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
       j_fwd[j] = IF[1, 0]
       j_bwd[j] = IF[0, 1]
       leak[j]  = Leak[1, 0]
@@ -56,7 +56,7 @@ def process_x_4d(k_idx, data, ny, n_ifaces, taus, dt, k_nn):
     for j in range(ny):
       for i in range(n_ifaces):
         pair = np.ascontiguousarray(data[k_idx, j, i:i+2, :])
-        IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+        IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
         j_fwd[j, i] = IF[1, 0]
         j_bwd[j, i] = IF[0, 1]
         leak[j, i]  = Leak[1, 0]
@@ -70,7 +70,7 @@ def process_y_4d(k_idx, data, n_jfaces, nx, taus, dt, k_nn):
     for j in range(n_jfaces):
       for i in range(nx):
         pair = np.ascontiguousarray(data[k_idx, j:j+2, i, :])
-        IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn)
+        IF, Leak, _ = information_flow_causal_map(pair, taus, dt=dt, k=k_nn, full=True)
         j_fwd[j, i] = IF[1, 0]
         j_bwd[j, i] = IF[0, 1]
         leak[j, i]  = Leak[1, 0]
