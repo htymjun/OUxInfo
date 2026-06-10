@@ -146,7 +146,7 @@ py::object information_flow_causal_map_wrapper(
   if (info_tau.itemsize != sizeof(int))
     throw std::runtime_error("tau must be int32");
 
-  int N  = static_cast<int>(info.shape[0]);
+  ssize_t N  = static_cast<ssize_t>(info.shape[0]);
   int Nt = static_cast<int>(info.shape[1]);
   int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
@@ -162,7 +162,7 @@ py::object information_flow_causal_map_wrapper(
   double *dI   = static_cast<double*>(dI_map.request().ptr);
   double *Leak = static_cast<double*>(Leak_map.request().ptr);
 
-  int num_pairs = N * (N - 1) / 2;
+  ssize_t num_pairs = N * (N - 1) / 2;
   std::vector<std::pair<int,int>> pairs;
   pairs.reserve(num_pairs);
   for (int j = 0; j < N; ++j)
@@ -283,7 +283,7 @@ py::object information_flow_causal_map_mask_wrapper(
   if (info_X.itemsize != sizeof(double))
     throw std::runtime_error("X must be float64");
 
-  int Nx = static_cast<int>(info_X.shape[0]);
+  ssize_t Nx = static_cast<ssize_t>(info_X.shape[0]);
   int Nt = static_cast<int>(info_X.shape[1]);
   double* X = static_cast<double*>(info_X.ptr);
 
@@ -400,7 +400,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
   if (info_tau.itemsize != sizeof(int))
     throw std::runtime_error("tau must be int32");
 
-  int N  = static_cast<int>(info.shape[0]);
+  ssize_t N  = static_cast<ssize_t>(info.shape[0]);
   int Nt = static_cast<int>(info.shape[1]);
   int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
@@ -412,7 +412,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
   py::array_t<double> IF_map({N,N});
   double *IF = static_cast<double*>(IF_map.request().ptr);
 
-  int num_pairs = N * (N - 1) / 2;
+  ssize_t num_pairs = N * (N - 1) / 2;
   std::vector<std::pair<int,int>> pairs;
   pairs.reserve(num_pairs);
   for (int j = 0; j < N; ++j)
@@ -471,7 +471,7 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
   if (info_X.itemsize != sizeof(double))
     throw std::runtime_error("X must be float64");
 
-  int Nx = static_cast<int>(info_X.shape[0]);
+  ssize_t Nx = static_cast<ssize_t>(info_X.shape[0]);
   int Nt = static_cast<int>(info_X.shape[1]);
   double* X = static_cast<double*>(info_X.ptr);
 
