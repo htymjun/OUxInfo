@@ -10,6 +10,7 @@
 #include "shannon_entropy.hpp"
 #include "kullback_leibler_divergence.hpp"
 #include "mutual_information.hpp"
+#include "information_flow.cpp"
 
 
 namespace py = pybind11;
@@ -283,13 +284,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  // shift data
-  int Neff = N - tau;
-  double *z = nullptr;
-  z = y + tau * dy;
-  double Ilag = mutual_info(&x, &z, k, dx, dy, Neff);
-  double I    = mutual_info(&x, &y, k, dx, dy, Neff);
-  return (Ilag - I) / dt;
+  return information_flow<double>(x, y, tau, dt, k, dx, dy, N);
 }
 
 
@@ -409,98 +404,6 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   return TE_map;
 }
 
-
-py::array_t<double> information_flow_causal_map_wrapper(
-  py::array_t<double, py::array::c_style> X_obj,
-  py::array_t<int,    py::array::c_style> tau_obj,
-  double dt=1.e0, int k=5, int n_threads=1){
-  /*
-  Parameters
-  ----------
-  X         : ndarray (N, Nt) or (N, Nt, dim)
-  tau       : ndarray (N)
-              Length of time delay
-  dt        : double, optional
-              Physical time
-  k         : int, optional
-              Number of nearest neighbors.
-  n_threads : int, optional
-              The number of threads used for OpenMP.
-  Returns
-  -------
-  double
-    information flow causal map.
-  */
-  py::buffer_info info     = X_obj.request();
-  py::buffer_info info_tau = tau_obj.request();
-  // error messages
-  if (info.ndim != 2 && info.ndim != 3)
-    throw std::runtime_error("X must be 2D (N, Nt) or 3D (N, Nt, dx)");
-  if (info_tau.ndim != 1)
-    throw std::runtime_error("tau must be 1D (N)");
-  if (info.itemsize != sizeof(double))
-    throw std::runtime_error("X must be float64");
-  if (info_tau.itemsize != sizeof(int))
-    throw std::runtime_error("tau must be int32");
-  // main
-  int N  = static_cast<int>(info.shape[0]);
-  int Nt = static_cast<int>(info.shape[1]);
-  int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
-  if (info_tau.shape[0] != N)
-    throw std::runtime_error("tau length must equal N");
-  // pointer
-  double *X = static_cast<double*>(info.ptr);
-  int *tau_arr = static_cast<int*>(info_tau.ptr);
-  py::array_t<double>   IF_map({N,N});
-  py::array_t<double>   dI_map({N,N});
-  py::array_t<double> Leak_map({N,N});
-  py::buffer_info info_IF   = IF_map.request();
-  py::buffer_info info_dI   = dI_map.request();
-  py::buffer_info info_Leak = Leak_map.request();
-  double *IF   = static_cast<double*>(info_IF.ptr);
-  double *dI   = static_cast<double*>(info_dI.ptr);
-  double *Leak = static_cast<double*>(info_Leak.ptr);
-  // main loop
-  omp_set_num_threads(n_threads);
-  #pragma omp parallel
-  {
-    #pragma omp for schedule(dynamic)
-    for (int j = 0; j < N; j++) {
-      double *xj = X + j * Nt * dx;
-      Leak[j*N + j] = std::numeric_limits<double>::quiet_NaN();
-      for (int i = 0; i < N; i++) {
-        if (i == j) {
-          IF[j*N + i] = std::numeric_limits<double>::quiet_NaN();
-          dI[j*N + i] = std::numeric_limits<double>::quiet_NaN();
-          continue;
-        }
-        int tau = tau_arr[i];
-        double *xi = X + i * Nt * dx;
-        /// shift
-        int Neff = Nt - tau;
-        double *y = xj + tau * dx;
-        double Ilag_y  = mutual_info(&xi, &y,  k, dx, dx, Neff);
-        double I       = mutual_info(&xi, &xj, k, dx, dx, Neff);
-        IF[j*N + i] = (Ilag_y - I) / dt;
-        if (i > j) {
-          double *x = xi + tau * dx;
-          double Ilag_xy = mutual_info(&x, &y, k, dx, dx, Neff);
-          dI[j*N + i] = (Ilag_xy - I) / dt;
-        }
-      }
-    }
-    #pragma omp for schedule(dynamic)
-    for (int j = 0; j < N; j++) {
-      for (int i = j + 1; i < N; i++) {
-        double leak_val = dI[j*N + i] - IF[j*N + i] - IF[i*N + j];
-        Leak[j*N + i] = leak_val;
-        Leak[i*N + j] = leak_val;
-        dI[i*N + j] = dI[j*N + i]; // for (i < j)
-      }
-    }
-  }
-  return py::make_tuple(IF_map, Leak_map, dI_map);
-}
 
 
 // ============================================================
@@ -697,30 +600,50 @@ Returns
 value : ndarray of shape (N, N)
     Causal map where entry [i, j] is TE(X_j -> X_i).
 )doc");
-  m.def("information_flow_causal_map", &information_flow_causal_map_wrapper,
-        py::arg("X"), py::arg("tau"), py::arg("dt")=1.e0, py::arg("k")=5, py::arg("n_threads")=1,
+  m.def("information_flow_causal_map", &information_flow_causal_map_dispatcher,
+        py::arg("X"),
+        py::arg("tau")       = py::int_(1),
+        py::arg("mask")      = py::none(),
+        py::arg("dt")        = 1.0,
+        py::arg("k")         = 5,
+        py::arg("n_threads") = 1,
+        py::arg("full")      = false,
         R"doc(Compute an information flow causal map for multivariate time series.
 
-Parameters
-----------
-X : ndarray of shape (N, Nt) or (N, Nt, dim)
-    Multivariate time series with N variables and Nt time steps.
-    Must be float64.
-tau : ndarray of shape (N,), dtype int32
-    Time delay for each variable.
+Two modes depending on whether *mask* is supplied:
+
+**No mask (default)** — full or IF-only computation:
+  tau : ndarray of shape (N,), dtype int32, or scalar int
+      Time delay per variable (scalar is broadcast to all variables).
+  X may be 2D (N, Nt) or 3D (N, Nt, dim).
+
+**With mask** — compute only the requested pairs:
+  tau  : scalar int or ndarray of shape (N,), dtype int32.
+  mask : ndarray of shape (N, N), dtype bool.
+      Compute IF only where mask[i, j] is True and i != j.
+  X must be 2D (N, Nt).
+
+Parameters common to both modes
+---------------------------------
+X : ndarray, float64
+    Multivariate time series, one row per variable.
 dt : float, optional
     Physical time step. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
 n_threads : int, optional
     Number of OpenMP threads. Default 1.
+full : bool, optional
+    If False (default), return only IF_map (skips the dI MI call and Leak computation).
+    If True, return a tuple (IF_map, Leak_map, dI_map).
 
 Returns
 -------
-value : tuple of three ndarray, each of shape (N, N)
-    (IF_map, Leak_map, dI_map) where IF_map[i, j] is the information flow
-    from X_j to X_i, Leak_map[i, j] is the associated leak, and dI_map[i, j]
-    is the mutual information rate.
+When full=False : ndarray of shape (N, N)
+    IF_map only.  IF_map[i, j] = IF from X_j to X_i.
+    Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
+When full=True : tuple of three ndarray of shape (N, N)
+    (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i.
+    Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
 )doc");
 }
-

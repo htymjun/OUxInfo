@@ -1,4 +1,4 @@
-recursive-include ouxinfo *.hpp
+recursive-include ouxinfo *.hpp *.cpp
 recursive-include third_party *
 include README.md
 include LICENSE
