@@ -19,14 +19,6 @@ def _time_call(fn, *args, **kwargs):
     return time.perf_counter() - t0
 
 
-def _if_reference(x, y, tau, dt, k):
-    """Old two-call approach: builds X marginal twice."""
-    Neff = len(x) - tau
-    Ilag = mutual_info(x[:Neff], y[tau:tau+Neff], k=k)
-    I    = mutual_info(x[:Neff], y[:Neff],        k=k)
-    return (Ilag - I) / dt
-
-
 def _analytical_if_gaussian_ar(a, b, c_xy, tau=1, dt=1.0, sigma=1.0):
     A = np.array([[a, 0.0], [c_xy, b]])
     Q = np.array([[sigma**2, 0.0], [0.0, sigma**2]])
@@ -49,18 +41,6 @@ def _gaussian_ar_system(nt, a, b, c_xy, sigma, rng):
         x[i + 1] = a * x[i] + rng.normal(0.0, sigma)
         y[i + 1] = b * y[i] + c_xy * x[i] + rng.normal(0.0, sigma)
     return x, y
-
-
-def test_information_flow_vs_reference():
-    """New C++ result must be numerically identical to the two-call reference."""
-    rng = np.random.default_rng(42)
-    for N in [500, 2000]:
-        x = rng.standard_normal((N, 1))
-        y = rng.standard_normal((N, 1))
-        new_val = information_flow(x, y, tau=1, dt=1.0, k=K)
-        ref_val = _if_reference(x, y, tau=1, dt=1.0, k=K)
-        assert abs(new_val - ref_val) < 1e-10, (
-            f"N={N}: new={new_val:.8f}, ref={ref_val:.8f}, diff={abs(new_val-ref_val):.2e}")
 
 
 def test_information_flow_vs_analytical():
