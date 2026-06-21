@@ -4,7 +4,7 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://htymjun.github.io/OUxInfo/)
 
 <p align="center">
-  <img src="docs/img/OUxInfo.png" alt="OUxInfo" width="600">
+  <img src="docs/img/OUxInfo.png" alt="OUxInfo">
 </p>
 
 OUxInfo is a high-performance Shannon entropy estimator for Python, powered by a C++ backend.
