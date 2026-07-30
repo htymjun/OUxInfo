@@ -7,7 +7,7 @@ def entropy_rate(x, tau=1, dt=1.e0, k=5):
 
   Parameters
   ----------
-  x : ndarray of shape (N), (N, dim) or (N, dim, var)
+  x : ndarray of shape (N), (N, dim) or (var, N, dim)
       Input data. Must be float64.
   tau : int, optional
       Time delay (in samples). Default 1.
@@ -28,10 +28,10 @@ def entropy_rate(x, tau=1, dt=1.e0, k=5):
     H2 = shannon_entropy(x[tau:],  k=k)
     return (H2 - H1) / dt
   elif x.ndim == 3:
-    n_vars = x.shape[2]
+    n_vars = x.shape[0]
     dHdt = np.zeros(n_vars)
     for i in range(n_vars):
-      x_var = x[:,:,i]
+      x_var = x[i,:,:]
       H1 = shannon_entropy(x_var[:-tau], k=k)
       H2 = shannon_entropy(x_var[tau:],  k=k)
       dHdt[i] = (H2 - H1) / dt

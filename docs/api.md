@@ -16,6 +16,12 @@ from ouxinfo import shannon_entropy, transfer_entropy, TEIFL
     options:
       show_root_heading: true
 
+### Entropy rate
+
+::: ouxinfo.entropy_rate
+    options:
+      show_root_heading: true
+
 ### KL Divergence
 
 ::: ouxinfo.KL_div
@@ -74,15 +80,15 @@ from ouxinfo import shannon_entropy, transfer_entropy, TEIFL
 
 ---
 
-## Spatial Information Flux
+## Spatial Information Flow
 
-### 1D Spatial Flux
+### 1D Spatial Flow
 
 ::: ouxinfo.flux1d.information_flow_1d
     options:
       show_root_heading: true
 
-### 2D Spatial Flux
+### 2D Spatial Flow
 
 ::: ouxinfo.flux1d.information_flow_2d
     options:
