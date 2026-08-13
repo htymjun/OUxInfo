@@ -1,0 +1,52 @@
+name: ✨ Feature Request
+description: Suggest a new capability or improvement for OUxInfo.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: feature
+    attributes:
+      label: Proposed feature
+      description: What should OUxInfo be able to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Explain the scientific, mathematical, or practical motivation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use case
+      render: python
+
+  - type: checkboxes
+    id: benefit
+    attributes:
+      label: Expected benefit
+      options:
+        - label: New information-theoretic quantity
+        - label: Better numerical accuracy
+        - label: Better robustness
+        - label: Performance
+        - label: Larger datasets / scalability
+        - label: Better Python usability
+        - label: Better platform support
+        - label: Documentation
+        - label: Other
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Possible implementation
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Papers, equations, implementations, or related Issues.

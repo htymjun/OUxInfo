@@ -1,0 +1,32 @@
+title: "Methodology Discussion"
+body:
+  - type: textarea
+    id: topic
+    attributes:
+      label: Topic
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide mathematical, numerical, or scientific context.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question / proposal
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+
+  - type: textarea
+    id: results
+    attributes:
+      label: Preliminary results
+      description: Optional calculations, plots, or numerical experiments.
