@@ -1,0 +1,82 @@
+name: 🐞 Bug Report
+description: Report incorrect results, crashes, build failures, or unexpected behavior.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing Issues before opening a new one.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Shannon entropy estimator
+        - Transfer entropy
+        - Backward transfer entropy
+        - Information flow
+        - C++ backend
+        - Python / pybind11 interface
+        - Build / installation
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest code example or steps that reproduce the problem.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        OUxInfo:
+        Python:
+        OS:
+        Architecture:
+        Compiler:
+        NumPy:
+        SciPy:
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message / log
+      render: text
+
+  - type: textarea
+    id: numerical
+    attributes:
+      label: Numerical evidence
+      description: Include reference values or comparisons if applicable.
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Possible cause or workaround

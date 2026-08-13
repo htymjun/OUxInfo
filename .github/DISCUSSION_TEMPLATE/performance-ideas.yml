@@ -1,0 +1,71 @@
+title: "Performance Idea"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rough or speculative ideas are welcome. A complete benchmark is not required.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: Describe your idea for making OUxInfo faster or more scalable.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: target
+    attributes:
+      label: Target
+      options:
+        - label: C++ backend
+        - label: Python / pybind11 interface
+        - label: Nearest-neighbor search
+        - label: Memory usage
+        - label: OpenMP
+        - label: SIMD / vectorization
+        - label: Data layout
+        - label: Algorithm
+        - label: I/O / data handling
+        - label: Other
+
+  - type: textarea
+    id: bottleneck
+    attributes:
+      label: Current bottleneck
+      description: Describe the suspected bottleneck if known.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed optimization
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected benefit
+      description: Estimate speedup, memory reduction, or scalability improvement if possible.
+
+  - type: checkboxes
+    id: tradeoffs
+    attributes:
+      label: Possible trade-offs
+      options:
+        - label: Reduced numerical accuracy
+        - label: Increased memory usage
+        - label: Increased code complexity
+        - label: Reduced portability
+        - label: Additional dependency
+        - label: Platform-specific implementation
+        - label: None known
+        - label: Other
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Benchmark / profiling evidence
+
+  - type: textarea
+    id: discussion
+    attributes:
+      label: Discussion

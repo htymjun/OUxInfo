@@ -1,0 +1,60 @@
+name: 🧪 Validation / Numerical Issue
+description: Report a discrepancy or propose a validation case.
+title: "[Validation] "
+labels: [validation]
+body:
+  - type: dropdown
+    id: quantity
+    attributes:
+      label: Quantity
+      options:
+        - Shannon entropy
+        - Transfer entropy
+        - Backward transfer entropy
+        - Information flow
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: dataset
+    attributes:
+      label: Dataset / stochastic process
+      description: Describe the data-generating process, sample size, dimensions, and preprocessing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: Analytical result, paper, reference implementation, or benchmark value.
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: Estimation setup
+      description: Include k, metric, normalization, embedding, lag, and other relevant parameters.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+
+  - type: textarea
+    id: obtained
+    attributes:
+      label: Obtained result
+
+  - type: textarea
+    id: discrepancy
+    attributes:
+      label: Discrepancy analysis
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      render: python

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💡 Performance Ideas
+    url: https://github.com/htymjun/OUxInfo/discussions
+    about: Discuss ideas for accelerating OUxInfo or scaling it to larger datasets.
+  - name: 🔬 Methodology Discussions
+    url: https://github.com/htymjun/OUxInfo/discussions
+    about: Discuss estimators, information-theoretic methods, and research applications.
