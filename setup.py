@@ -72,7 +72,7 @@ setup(
   zip_safe=False,
   python_requires=">=3.10",
   install_requires=[
-    'numpy<=2.4',
+    'numpy>=1.24,<3',
     'matplotlib',
     'scipy',
     'tqdm',

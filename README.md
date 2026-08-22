@@ -80,7 +80,7 @@ This project depends on the following libraries;
 ### nanoflann (BSD License)
  * Copyright 2008-2009  Marius Muja (mariusm@cs.ubc.ca). All rights reserved.
  * Copyright 2008-2009  David G. Lowe (lowe@cs.ubc.ca). All rights reserved.
- * Copyright 2011-2026  Jose L. Blanco (joseluisblancoc@gmail.com).
+ * Copyright 2011-2025  Jose Luis. Blanco (joseluisblancoc@gmail.com).
 Redistribution and use in source and binary forms are permitted under the BSD License.
 Full text: `third_party/nanoflann/LICENSE`.
 
