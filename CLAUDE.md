@@ -51,7 +51,7 @@ All estimators use k-nearest-neighbor (KSG/Kozachenko-Leonenko) methods with a C
 
 `ouxinfo.cpp` also implements transfer entropy, information flow, backward transfer entropy, and multivariate causal maps, then exposes everything to Python via **pybind11** as the `_core` module.
 
-Bundled third-party C++ code lives in `third_party/` (Boost digamma) and `ouxinfo/nanoflann.hpp`.
+Bundled third-party C++ code lives in `third_party/` (Boost digamma in `third_party/boost/`, nanoflann in `third_party/nanoflann/`).
 
 ### 2. Python API (`ouxinfo/`)
 
@@ -72,7 +72,7 @@ Bundled third-party C++ code lives in `third_party/` (Boost digamma) and `ouxinf
 
 - **pybind11** — Python/C++ bindings
 - **numpy, scipy, matplotlib, numba** — installed automatically via `pyproject.toml`
-- **Boost** (bundled in `third_party/`), **nanoflann** (bundled in `ouxinfo/`)
+- **Boost** (bundled in `third_party/boost/`), **nanoflann** (bundled in `third_party/nanoflann/`)
 - Python >= 3.12, GCC >= 13
 
 ## Tests

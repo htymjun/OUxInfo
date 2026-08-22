@@ -58,7 +58,7 @@ This repository contains the implementation used in the following publication:
 
 Jun Hatayama, Kento Tanaka, and Toshinori Kouchi. "Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory." Computers & Fluids (2026): 107016.
 
-~~~bash
+~~~bibtex
 @article{hatayama2026nonlinear,
   title={Nonlinear causal relationship between separation bubbles and reflected shock wave in shock wave/turbulent boundary layer interaction based on information theory},
   author={Hatayama, Jun and Tanaka, Kento and Kouchi, Toshinori},
@@ -80,17 +80,19 @@ This project depends on the following libraries;
 ### nanoflann (BSD License)
  * Copyright 2008-2009  Marius Muja (mariusm@cs.ubc.ca). All rights reserved.
  * Copyright 2008-2009  David G. Lowe (lowe@cs.ubc.ca). All rights reserved.
- * Copyright 2011-2025  Jose Luis Blanco (joseluisblancoc@gmail.com).
+ * Copyright 2011-2026  Jose L. Blanco (joseluisblancoc@gmail.com).
 Redistribution and use in source and binary forms are permitted under the BSD License.
+Full text: `third_party/nanoflann/LICENSE`.
 
 ### Boost C++ Libraries (Boost Software License 1.0)
  * Copyright John Maddock 2006, 2007.
  * Copyright Paul A. Bristow 2006, 2007, 2009, 2010.
 Use, modification and distribution are subject to the
-Boost Software License, Version 1.0. (See accompanying file
-LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+Boost Software License, Version 1.0. Full text: `third_party/boost/LICENSE_1_0.txt`
+or a copy at http://www.boost.org/LICENSE_1_0.txt
 
-Boost is now bundled in the `third_party/` directory and is used automatically during build.
+Boost is bundled in `third_party/boost/` and nanoflann in `third_party/nanoflann/`;
+both are used automatically during build.
 
 ### pybind11 (BSD License)
 Used for Python bindings.
@@ -108,4 +110,3 @@ Development during 2025 was primarily conducted by the project owners.
 Starting in 2026, the project expanded its contributor base and introduced AI-assisted "vibe coding" workflows using Claude Code.
 
 To maintain transparency, we aim to clearly distinguish which parts of the codebase and development workflow involve AI-generated content or AI-assisted modifications. In addition, as part of our effort to share practical knowledge on AI-assisted development in the community, we provide Claude Code plan files under `./docs/plans`.
-

@@ -31,7 +31,7 @@ class CustomBuildExt(build_ext):
     machine = _target_machine()
 
     if sys.platform == "win32":
-      compile_args = ["/O2", "/std:c++14"]
+      compile_args = ["/O2", "/std:c++14", "/openmp"]
       link_args = []
     elif sys.platform == "darwin":
       compile_args = ["-Ofast", "-fopenmp", "-std=c++14", "-fPIC"]
@@ -53,7 +53,7 @@ ext_modules = [
   Pybind11Extension(
     "ouxinfo._core",
     ["ouxinfo/ouxinfo.cpp"],
-    include_dirs=["ouxinfo", "third_party"],
+    include_dirs=["ouxinfo", "third_party", "third_party/nanoflann"],
     cxx_std=14,
   ),
 ]
