@@ -146,7 +146,7 @@ py::object information_flow_causal_map_wrapper(
   if (info_tau.itemsize != sizeof(int))
     throw std::runtime_error("tau must be int32");
 
-  ssize_t N  = static_cast<ssize_t>(info.shape[0]);
+  py::ssize_t N  = info.shape[0];
   int Nt = static_cast<int>(info.shape[1]);
   int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
@@ -162,7 +162,7 @@ py::object information_flow_causal_map_wrapper(
   double *dI   = static_cast<double*>(dI_map.request().ptr);
   double *Leak = static_cast<double*>(Leak_map.request().ptr);
 
-  ssize_t num_pairs = N * (N - 1) / 2;
+  py::ssize_t num_pairs = N * (N - 1) / 2;
   std::vector<std::pair<int,int>> pairs;
   pairs.reserve(num_pairs);
   for (int j = 0; j < N; ++j)
@@ -190,7 +190,7 @@ py::object information_flow_causal_map_wrapper(
     my_kd_tree_t<double>* const no_kd = nullptr;
 
     #pragma omp parallel for schedule(dynamic)
-    for (int p = 0; p < num_pairs; ++p) {
+    for (py::ssize_t p = 0; p < num_pairs; ++p) {
       int j = pairs[p].first;
       int i = pairs[p].second;
       double* xi = X + i * Nt;
@@ -220,7 +220,7 @@ py::object information_flow_causal_map_wrapper(
   } else {
     // dx > 1: general path using mutual_info (builds all marginals per call)
     #pragma omp parallel for schedule(dynamic)
-    for (int p = 0; p < num_pairs; ++p) {
+    for (py::ssize_t p = 0; p < num_pairs; ++p) {
       int j = pairs[p].first;
       int i = pairs[p].second;
 
@@ -256,7 +256,7 @@ py::object information_flow_causal_map_wrapper(
 
     // Leak: computed after IF and dI are fully written
     #pragma omp parallel for schedule(dynamic)
-    for (int p = 0; p < num_pairs; ++p) {
+    for (py::ssize_t p = 0; p < num_pairs; ++p) {
       int j = pairs[p].first;
       int i = pairs[p].second;
       double leak_val = dI[j*N+i] - IF[j*N+i] - IF[i*N+j];
@@ -283,7 +283,7 @@ py::object information_flow_causal_map_mask_wrapper(
   if (info_X.itemsize != sizeof(double))
     throw std::runtime_error("X must be float64");
 
-  ssize_t Nx = static_cast<ssize_t>(info_X.shape[0]);
+  py::ssize_t Nx = info_X.shape[0];
   int Nt = static_cast<int>(info_X.shape[1]);
   double* X = static_cast<double*>(info_X.ptr);
 
@@ -348,8 +348,9 @@ py::object information_flow_causal_map_mask_wrapper(
   my_kd_tree_t<double>* const no_kd = nullptr;
 
   omp_set_num_threads(n_threads);
+  const py::ssize_t num_pairs = static_cast<py::ssize_t>(pairs.size());
   #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < (int)pairs.size(); ++p) {
+  for (py::ssize_t p = 0; p < num_pairs; ++p) {
     int a = pairs[p].first;
     int b = pairs[p].second;
     double* xa = X + a * Nt;
@@ -400,7 +401,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
   if (info_tau.itemsize != sizeof(int))
     throw std::runtime_error("tau must be int32");
 
-  ssize_t N  = static_cast<ssize_t>(info.shape[0]);
+  py::ssize_t N  = info.shape[0];
   int Nt = static_cast<int>(info.shape[1]);
   int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
@@ -412,7 +413,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
   py::array_t<double> IF_map({N,N});
   double *IF = static_cast<double*>(IF_map.request().ptr);
 
-  ssize_t num_pairs = N * (N - 1) / 2;
+  py::ssize_t num_pairs = N * (N - 1) / 2;
   std::vector<std::pair<int,int>> pairs;
   pairs.reserve(num_pairs);
   for (int j = 0; j < N; ++j)
@@ -424,7 +425,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
 
   omp_set_num_threads(n_threads);
   #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < num_pairs; ++p) {
+  for (py::ssize_t p = 0; p < num_pairs; ++p) {
     int j = pairs[p].first;
     int i = pairs[p].second;
 
@@ -471,7 +472,7 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
   if (info_X.itemsize != sizeof(double))
     throw std::runtime_error("X must be float64");
 
-  ssize_t Nx = static_cast<ssize_t>(info_X.shape[0]);
+  py::ssize_t Nx = info_X.shape[0];
   int Nt = static_cast<int>(info_X.shape[1]);
   double* X = static_cast<double*>(info_X.ptr);
 
@@ -527,8 +528,9 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
   my_kd_tree_t<double>* const no_kd = nullptr;  // dx==1: kd-tree path never used
 
   omp_set_num_threads(n_threads);
+  const py::ssize_t num_pairs = static_cast<py::ssize_t>(pairs.size());
   #pragma omp parallel for schedule(dynamic)
-  for (int p = 0; p < (int)pairs.size(); ++p) {
+  for (py::ssize_t p = 0; p < num_pairs; ++p) {
     int a = pairs[p].first;
     int b = pairs[p].second;
 

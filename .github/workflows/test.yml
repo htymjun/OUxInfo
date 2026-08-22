@@ -6,7 +6,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -17,13 +21,25 @@ jobs:
           python-version: "3.12"
 
       - name: Install GCC and G++
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y gcc g++
 
       - name: Install dependencies
-        run: pip install setuptools pybind11 infomeasure pytest build
+        run: pip install setuptools pybind11 pytest build
 
-      - name: Build the project
+      - name: Install Linux-only dependencies
+        if: runner.os == 'Linux'
+        run: pip install infomeasure
+
+      # Linux: GCC with -Ofast -fopenmp (see setup.py)
+      - name: Build the project (GCC)
+        if: runner.os == 'Linux'
         run: bash ./rebuild.sh
-        
+
+      # Windows: MSVC with /O2 /std:c++14 /openmp (see setup.py)
+      - name: Build the project (MSVC)
+        if: runner.os == 'Windows'
+        run: pip install .
+
       - name: Run tests
         run: pytest tests/ -v
