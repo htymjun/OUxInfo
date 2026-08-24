@@ -25,6 +25,36 @@ jobs:
           ")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Check CITATION.cff version matches _version.py
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          version = pathlib.Path("ouxinfo/_version.py").read_text(encoding="utf-8")
+          citation = pathlib.Path("CITATION.cff").read_text(encoding="utf-8")
+          version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', version)
+          citation_match = re.search(r'(?m)^version:\s*(.+)$', citation)
+
+          if version_match is None:
+              print("Could not find __version__ in ouxinfo/_version.py", file=sys.stderr)
+              raise SystemExit(1)
+          if citation_match is None:
+              print("Could not find version field in CITATION.cff", file=sys.stderr)
+              raise SystemExit(1)
+
+          version_value = version_match.group(1).strip()
+          citation_value = citation_match.group(1).strip()
+          if citation_value != version_value:
+              print(
+                  f"CITATION.cff version {citation_value!r} does not match "
+                  f"ouxinfo/_version.py version {version_value!r}",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          PY
+
       - name: Check if tag exists
         id: tag_check
         run: |

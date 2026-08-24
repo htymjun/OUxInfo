@@ -1,5 +1,9 @@
 [![PyPI version](https://img.shields.io/pypi/v/ouxinfo.svg)](https://pypi.org/project/ouxinfo/)
 [![Downloads](https://img.shields.io/pypi/dm/ouxinfo)](https://pypi.org/project/ouxinfo/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/ouxinfo?label=conda-forge)](https://anaconda.org/conda-forge/ouxinfo)
+[![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/ouxinfo.svg)](https://anaconda.org/conda-forge/ouxinfo)
+[![Conda Recipe](https://img.shields.io/badge/recipe-ouxinfo-green.svg)](https://anaconda.org/conda-forge/ouxinfo)
+[![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/ouxinfo.svg)](https://anaconda.org/conda-forge/ouxinfo)
 [![DOI](https://zenodo.org/badge/1057221883.svg)](https://doi.org/10.5281/zenodo.19303016)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://htymjun.github.io/OUxInfo/)
 
@@ -21,18 +25,45 @@ It is designed for fast and scalable entropy estimation, particularly for causal
 * GCC >= 11 (>= 13 recommended)
 * OpenMP support (-fopenmp)
 
-### Install via pip
-* PyPI
-~~~bash
-$ pip install ouxinfo
-~~~
-* Clone this repository and
-~~~bash
-$ pip install .
-~~~
+<details>
+<summary>With pip</summary>
+
+```
+pip install ouxinfo
+```
+
+</details>
+
+<details>
+<summary>With conda-forge</summary>
+
+```
+conda install -c conda-forge ouxinfo
+```
+
+</details>
+
+<details>
+<summary>With mamba</summary>
+
+```
+mamba install -c conda-forge ouxinfo
+```
+
+</details>
+
+<details>
+<summary>With pixi</summary>
+
+```
+pixi add ouxinfo
+```
+
+</details>
+
 
 ### Dependencies
-#### Python packages (installed automatically via pip)
+#### Python packages (installed automatically)
 * pybind11
 * numpy
 * scipy
