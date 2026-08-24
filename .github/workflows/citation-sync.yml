@@ -1,0 +1,46 @@
+name: Citation sync check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    if: ${{ github.event_name == 'pull_request' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check CITATION.cff version matches _version.py
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path('.')
+          version_text = (root / 'ouxinfo' / '_version.py').read_text(encoding='utf-8')
+          citation_text = (root / 'CITATION.cff').read_text(encoding='utf-8')
+
+          version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', version_text)
+          citation_match = re.search(r'(?m)^version:\s*(.+)$', citation_text)
+
+          if version_match is None:
+              print('Could not find __version__ in ouxinfo/_version.py', file=sys.stderr)
+              raise SystemExit(1)
+          if citation_match is None:
+              print('Could not find version field in CITATION.cff', file=sys.stderr)
+              raise SystemExit(1)
+
+          version = version_match.group(1).strip()
+          citation_version = citation_match.group(1).strip()
+
+          if citation_version != version:
+              print(
+                  f'CITATION.cff version {citation_version!r} does not match '
+                  f'ouxinfo/_version.py version {version!r}',
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          PY

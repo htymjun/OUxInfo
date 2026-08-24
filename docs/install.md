@@ -12,6 +12,21 @@ Boost is now bundled in the `third_party/` directory. You do not need to install
 pip install ouxinfo
 ```
 
+## Install via conda-forge
+```bash
+conda install -c conda-forge ouxinfo
+```
+
+## Install via mamba
+```bash
+mamba install -c conda-forge ouxinfo
+```
+
+## Install via pixi
+```bash
+pixi add ouxinfo
+```
+
 ## Install locally
 ```bash
 pip install .

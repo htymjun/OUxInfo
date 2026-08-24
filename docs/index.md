@@ -1,5 +1,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/ouxinfo.svg)](https://pypi.org/project/ouxinfo/)
 [![Downloads](https://img.shields.io/pypi/dm/ouxinfo)](https://pypi.org/project/ouxinfo/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/ouxinfo?label=conda-forge)](https://anaconda.org/conda-forge/ouxinfo)
 [![DOI](https://zenodo.org/badge/1057221883.svg)](https://doi.org/10.5281/zenodo.19303016)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -19,6 +20,26 @@ The C++ core uses [nanoflann](https://github.com/jlblancoc/nanoflann) for fast k
 ---
 
 ## Quick Start
+
+### Install via conda-forge
+
+```bash
+conda install -c conda-forge ouxinfo
+```
+
+### Install via mamba
+
+```bash
+mamba install -c conda-forge ouxinfo
+```
+
+### Install via pixi
+
+```bash
+pixi add ouxinfo
+```
+
+### Install via pip
 
 ```bash
 pip install ouxinfo
