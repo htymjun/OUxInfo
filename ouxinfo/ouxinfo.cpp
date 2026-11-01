@@ -250,7 +250,7 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
 
 double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                                 py::array_t<double, py::array::c_style> y_obj,
-                                int tau=1, double dt=1.e0, int k=5){
+                                int tau=1, double dt=1.e0, int k=5, py::object z_obj=py::none()){
   /*
   Parameters
   ----------
@@ -262,6 +262,8 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
         Physical time
   k   : int, optional
         Number of nearest neighbors.
+  z   : ndarray (N, dim), optional
+        Conditioning variable (conditional information flow).
   Returns
   -------
   double
@@ -284,7 +286,26 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  return information_flow<double>(x, y, tau, dt, k, dx, dy, N);
+  if (tau < 0) {
+    throw std::runtime_error("tau must be non-negative");
+  }
+  if (z_obj.is_none()) {
+    return information_flow<double>(x, y, tau, dt, k, dx, dy, N);
+  }
+  auto z_arr = z_obj.cast<py::array_t<double, py::array::c_style | py::array::forcecast>>();
+  py::buffer_info info_z = z_arr.request();
+  if (info_z.ndim != 2) {
+    throw std::runtime_error("Input dimension must be 2");
+  }
+  if (info_z.shape[0] != N) {
+    throw std::runtime_error("Input argument must be the same length");
+  }
+  const double *z = static_cast<const double*>(info_z.ptr);
+  int dz = static_cast<int>(info_z.shape[1]);
+  if (dz < 1) {
+    throw std::runtime_error("Z must have at least one column");
+  }
+  return conditional_information_flow<double>(x, y, z, tau, dt, k, dx, dy, dz, N);
 }
 
 
@@ -542,6 +563,7 @@ See: Schreiber (2000), Kraskov et al. (2004).
 )doc");
   m.def("information_flow", &information_flow_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("dt")=1.e0, py::arg("k")=5,
+        py::arg("Z")=py::none(),
         R"doc(Compute information flow from X to Y using the KSG estimator.
 
 Parameters
@@ -556,6 +578,9 @@ dt : float, optional
     Physical time step. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
+Z : ndarray of shape (N, dim_z), optional
+    Conditioning time series. If given, the conditional information flow
+    from X to Y given Z is returned. Default None.
 
 Returns
 -------
@@ -567,6 +592,15 @@ Notes
 Based on the decomposition
 
     dI/dt = dI_X + dI_Y + Leak
+
+The estimate is
+
+    T_{X->Y}   = [I(X_t; Y_{t+tau}) - I(X_t; Y_t)] / dt
+    T_{X->Y|Z} = [I(X_t; Y_{t+tau} | Z_t) - I(X_t; Y_t | Z_t)] / dt
+
+with t = 0, ..., N - tau - 1. The conditional mutual informations use the
+KSG estimator of Frenzel & Pompe (2007). With Z = Y, T_{X->Y|Z} equals the
+transfer entropy I(X_t; Y_{t+tau} | Y_t) / dt.
 
 See: Horowitz & Esposito (2014).
 )doc");
@@ -608,6 +642,7 @@ value : ndarray of shape (N, N)
         py::arg("k")         = 5,
         py::arg("n_threads") = 1,
         py::arg("full")      = false,
+        py::arg("Z")         = py::none(),
         R"doc(Compute an information flow causal map for multivariate time series.
 
 Two modes depending on whether *mask* is supplied:
@@ -636,6 +671,11 @@ n_threads : int, optional
 full : bool, optional
     If False (default), return only IF_map (skips the dI MI call and Leak computation).
     If True, return a tuple (IF_map, Leak_map, dI_map).
+Z : ndarray of shape (Nt,) or (Nt, dim_z), optional
+    Conditioning time series shared by all pairs. If given, every mutual
+    information is replaced by the conditional mutual information given Z_t
+    (conditional causal map). X may then be 2D or 3D in both modes.
+    Default None.
 
 Returns
 -------
@@ -645,5 +685,18 @@ When full=False : ndarray of shape (N, N)
 When full=True : tuple of three ndarray of shape (N, N)
     (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i.
     Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
+
+Notes
+-----
+With Z, for each pair (i, j) and t = 0, ..., Nt - tau - 1,
+
+    IF_map[i, j] = [I(X_j,t; X_i,t+tau | Z_t) - I(X_j,t; X_i,t | Z_t)] / dt
+    dI_map[i, j] = [I(X_i,t+tau; X_j,t+tau | Z_t) - I(X_i,t; X_j,t | Z_t)] / dt
+    Leak_map     = dI_map - IF_map - IF_map.T
+
+Z is held at time t in every term, so dI_map is the change of I(X_i; X_j | Z_t)
+caused by the evolution of X_i and X_j only, and Leak_map keeps its meaning of
+the part of that change not split into the two flows. IF_map[i, j] equals the
+single-pair conditional information flow from X_j to X_i (information_flow with Z).
 )doc");
 }

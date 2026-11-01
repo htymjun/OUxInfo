@@ -130,6 +130,140 @@ T information_flow(T* X, T* Y, int tau, T dt, int k, int dx, int dy, int N) {
 
 
 // ============================================================
+// Point set for strict Chebyshev radius counts
+//
+// Owns a row-major copy of the concatenated blocks, e.g. (X_i, Z_i).
+// 1D spaces use the sorted array, >1D spaces a kd-tree.  The PointCloud
+// is heap-allocated so that the kd-tree's reference to it survives moves.
+// ============================================================
+template<typename T>
+struct CountSpace {
+  int n = 0, dim = 0;
+  std::vector<T> pts;
+  SortedArray1D<T> sa;
+  std::unique_ptr<PointCloud> cloud;
+  std::unique_ptr<my_kd_tree_t<T>> tree;
+
+  // blocks: {pointer to N x d row-major data, d}
+  void build(const std::vector<std::pair<const T*, int>>& blocks, int N) {
+    n = N; dim = 0;
+    for (const auto& b : blocks) dim += b.second;
+    pts.resize((size_t)N * dim);
+    for (int i = 0; i < N; i++) {
+      int off = 0;
+      for (const auto& b : blocks) {
+        for (int j = 0; j < b.second; j++)
+          pts[(size_t)i*dim+off+j] = b.first[(size_t)i*b.second+j];
+        off += b.second;
+      }
+    }
+    if (dim == 1) {
+      sa.build(pts.data(), N);
+    } else {
+      cloud = std::make_unique<PointCloud>();
+      cloud->N = N; cloud->dim = dim; cloud->pts = pts.data();
+      tree = std::make_unique<my_kd_tree_t<T>>(dim, *cloud, KDTreeSingleIndexAdaptorParams(10));
+      tree->buildIndex();
+    }
+  }
+
+  const T* point(int i) const { return &pts[(size_t)i * dim]; }
+
+  // Number of points j != i with max_d |p_j - p_i| < eps.
+  int count(int i, T eps) const {
+    if (dim == 1) return sa.countStrict(pts[i], eps, i);
+    StrictRadiusCountSet<T> rs(eps, (size_t)i);
+    tree->findNeighbors(rs, point(i), SearchParameters(0, false));
+    return (int)rs.count;
+  }
+};
+
+
+// ============================================================
+// CMI with prebuilt marginal spaces
+//
+// KSG (Frenzel-Pompe) estimate of I(X; Y | Z) reusing count spaces built
+// by the caller with rows sZ = (Z_i), sXZ = (X_i, Z_i), sYZ = (Y_i, Z_i).
+// The joint XYZ points are assembled from sXZ and the Y part of sYZ, so
+// the joint space is consistent with the marginals by construction.
+// ============================================================
+template<typename T>
+T cmi_with_prebuilt(const CountSpace<T>& sZ, const CountSpace<T>& sXZ,
+                    const CountSpace<T>& sYZ, int k)
+{
+  const int N = sZ.n;
+  if (sXZ.n != N || sYZ.n != N)
+    throw std::runtime_error("cmi_with_prebuilt: count spaces differ in length");
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
+  const int dxz  = sXZ.dim;
+  const int dy   = sYZ.dim - sZ.dim;
+  const int dxyz = dxz + dy;
+
+  std::vector<T> XYZ((size_t)N * dxyz);
+  for (int i = 0; i < N; i++) {
+    const T* xz = sXZ.point(i);
+    const T* yz = sYZ.point(i);
+    for (int j = 0; j < dxz; j++) XYZ[(size_t)i*dxyz+j]     = xz[j];
+    for (int j = 0; j < dy;  j++) XYZ[(size_t)i*dxyz+dxz+j] = yz[j];
+  }
+  PointCloud cloud_XYZ;
+  cloud_XYZ.N = N; cloud_XYZ.dim = dxyz; cloud_XYZ.pts = XYZ.data();
+  my_kd_tree_t<T> index_XYZ(dxyz, cloud_XYZ, KDTreeSingleIndexAdaptorParams(10));
+
+  T   sum_psi_nZ = 0, sum_psi_nXZ = 0, sum_psi_nYZ = 0;
+  int valid_pts  = 0;
+  #pragma omp parallel reduction(+:sum_psi_nZ, sum_psi_nXZ, sum_psi_nYZ, valid_pts)
+  {
+  std::vector<size_t> ret_index(k+1);
+  std::vector<T>      out_dist(k+1);
+  #pragma omp for schedule(static)
+  for (int i = 0; i < N; i++) {
+    KNNResultSet<T> resultSet(k+1);
+    resultSet.init(ret_index.data(), out_dist.data());
+    index_XYZ.findNeighbors(resultSet, &XYZ[(size_t)i * dxyz], SearchParameters(0, false));
+    T eps = out_dist[k];
+
+    // only degenerate points with eps == 0 (duplicates) are skipped
+    if (eps > 0) {
+      sum_psi_nZ  += digamma(sZ.count(i, eps)  + 1.0);
+      sum_psi_nXZ += digamma(sXZ.count(i, eps) + 1.0);
+      sum_psi_nYZ += digamma(sYZ.count(i, eps) + 1.0);
+      ++valid_pts;
+    }
+  }
+  }
+  T I = T(0);
+  if (valid_pts > 0)
+    I = digamma(k) + sum_psi_nZ/valid_pts - sum_psi_nXZ/valid_pts - sum_psi_nYZ/valid_pts;
+  return I;
+}
+
+
+// ============================================================
+// Conditional information flow
+//   dI_{X->Y|Z} ≈ (I(X_t; Y_{t+tau} | Z_t) − I(X_t; Y_t | Z_t)) / dt
+//
+// The Z and XZ spaces are shared between both CMI calls.
+// ============================================================
+template<typename T>
+T conditional_information_flow(const T* X, const T* Y, const T* Z, int tau, T dt, int k,
+                               int dx, int dy, int dz, int N) {
+  if (N <= tau) return T(0);
+  int Neff = N - tau;
+
+  CountSpace<T> sZ, sXZ, sYZ, sYlagZ;
+  sZ.build({{Z, dz}}, Neff);
+  sXZ.build({{X, dx}, {Z, dz}}, Neff);
+  sYZ.build({{Y, dy}, {Z, dz}}, Neff);
+  sYlagZ.build({{Y + (size_t)tau * dy, dy}, {Z, dz}}, Neff);
+
+  T Ilag = cmi_with_prebuilt(sZ, sXZ, sYlagZ, k);
+  T I    = cmi_with_prebuilt(sZ, sXZ, sYZ,    k);
+  return (Ilag - I) / dt;
+}
+
+
+// ============================================================
 // Full causal map: no mask  →  (IF, Leak, dI)
 // ============================================================
 py::object information_flow_causal_map_wrapper(
@@ -558,6 +692,138 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
 
 
 // ============================================================
+// Conditional causal map (optional mask)  →  IF_map or (IF, Leak, dI)
+//
+// Every MI of the unconditional map is replaced by a CMI given Z_t:
+//   IF[a, b] = (I(x_b,t; x_a,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / dt
+//   dI[a, b] = (I(x_a,t+tau; x_b,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / dt
+//   Leak     = dI − IF[a, b] − IF[b, a]
+// Z is held at time t in every term, so Leak keeps its unconditional
+// meaning (the part of the joint change not split into the two flows).
+// Per-variable spaces (x_v,t, Z_t) and (x_v,t+tau, Z_t) and the Z_t space
+// are built once; each CMI then builds only its joint tree.
+// ============================================================
+py::object information_flow_causal_map_cond_wrapper(
+  py::array_t<double, py::array::c_style> X_obj,
+  py::object Z_obj,
+  py::object mask_obj,
+  int tau, double dt=1.0, int k=5, int n_threads=1, bool full=false)
+{
+  py::buffer_info info = X_obj.request();
+  if (info.ndim != 2 && info.ndim != 3)
+    throw std::runtime_error("X must be 2D (N, Nt) or 3D (N, Nt, dx)");
+  if (info.itemsize != sizeof(double))
+    throw std::runtime_error("X must be float64");
+  py::ssize_t Nx = info.shape[0];
+  int Nt = static_cast<int>(info.shape[1]);
+  int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
+  double* X = static_cast<double*>(info.ptr);
+
+  auto Z_arr = Z_obj.cast<py::array_t<double, py::array::c_style | py::array::forcecast>>();
+  py::buffer_info info_Z = Z_arr.request();
+  if (info_Z.ndim != 1 && info_Z.ndim != 2)
+    throw std::runtime_error("Z must be 1D (Nt) or 2D (Nt, dz)");
+  if (info_Z.shape[0] != Nt)
+    throw std::runtime_error("Z must have Nt rows (one per time step of X)");
+  int dz = (info_Z.ndim == 2) ? static_cast<int>(info_Z.shape[1]) : 1;
+  if (dz < 1)
+    throw std::runtime_error("Z must have at least one column");
+  const double* Z = static_cast<const double*>(info_Z.ptr);
+
+  bool has_mask = !mask_obj.is_none();
+  py::array_t<bool, py::array::c_style> mask_arr;
+  const bool* mask = nullptr;
+  if (has_mask) {
+    mask_arr = mask_obj.cast<py::array_t<bool, py::array::c_style>>();
+    py::buffer_info info_mask = mask_arr.request();
+    if (info_mask.ndim != 2)
+      throw std::runtime_error("mask must be 2D (Nx, Nx)");
+    if (info_mask.itemsize != sizeof(bool))
+      throw std::runtime_error("mask must be bool");
+    if (info_mask.shape[0] != Nx || info_mask.shape[1] != Nx)
+      throw std::runtime_error("mask must be (Nx, Nx)");
+    mask = static_cast<const bool*>(info_mask.ptr);
+  }
+
+  py::array_t<double>   IF_map({Nx, Nx});
+  py::array_t<double>   dI_map({Nx, Nx});
+  py::array_t<double> Leak_map({Nx, Nx});
+  double* IF   = static_cast<double*>(IF_map.request().ptr);
+  double* dI   = static_cast<double*>(dI_map.request().ptr);
+  double* Leak = static_cast<double*>(Leak_map.request().ptr);
+  const double NaN = std::numeric_limits<double>::quiet_NaN();
+  std::fill(IF,   IF   + Nx * Nx, 0.0);
+  std::fill(dI,   dI   + Nx * Nx, 0.0);
+  std::fill(Leak, Leak + Nx * Nx, 0.0);
+  for (py::ssize_t v = 0; v < Nx; ++v)
+    IF[v*Nx+v] = dI[v*Nx+v] = Leak[v*Nx+v] = NaN;
+
+  std::vector<std::pair<int,int>> pairs;
+  std::vector<char> used(Nx, 0);
+  for (int a = 0; a < Nx; ++a)
+    for (int b = a + 1; b < Nx; ++b)
+      if (!has_mask || mask[a * Nx + b] || mask[b * Nx + a]) {
+        pairs.push_back({a, b});
+        used[a] = used[b] = 1;
+      }
+  const py::ssize_t num_pairs = static_cast<py::ssize_t>(pairs.size());
+
+  int Neff = Nt - tau;
+  if (Neff <= 0) {
+    for (const auto& p : pairs) {
+      int a = p.first, b = p.second;
+      IF[a*Nx+b] = IF[b*Nx+a] = dI[a*Nx+b] = dI[b*Nx+a] =
+        Leak[a*Nx+b] = Leak[b*Nx+a] = NaN;
+    }
+    if (full) return py::make_tuple(IF_map, Leak_map, dI_map);
+    return IF_map;
+  }
+
+  omp_set_num_threads(n_threads);
+
+  // sA[v] = (x_v,t, Z_t), sB[v] = (x_v,t+tau, Z_t), t = 0..Neff-1
+  CountSpace<double> sZ;
+  sZ.build({{Z, dz}}, Neff);
+  std::vector<CountSpace<double>> sA(Nx), sB(Nx);
+  std::vector<int> used_vars;
+  for (int v = 0; v < Nx; ++v)
+    if (used[v]) used_vars.push_back(v);
+  const int num_used = static_cast<int>(used_vars.size());
+  #pragma omp parallel for schedule(dynamic)
+  for (int u = 0; u < num_used; ++u) {
+    int v = used_vars[u];
+    const double* xv = X + (size_t)v * Nt * dx;
+    sA[v].build({{xv, dx}, {Z, dz}}, Neff);
+    sB[v].build({{xv + (size_t)tau * dx, dx}, {Z, dz}}, Neff);
+  }
+
+  #pragma omp parallel for schedule(dynamic)
+  for (py::ssize_t p = 0; p < num_pairs; ++p) {
+    int a = pairs[p].first;
+    int b = pairs[p].second;
+
+    double I_ab    = cmi_with_prebuilt(sZ, sA[a], sA[b], k);
+    double Ilag_ab = cmi_with_prebuilt(sZ, sA[b], sB[a], k);   // x_b,t vs x_a,t+tau
+    double Ilag_ba = cmi_with_prebuilt(sZ, sA[a], sB[b], k);   // x_a,t vs x_b,t+tau
+    double if_ab   = (Ilag_ab - I_ab) / dt;
+    double if_ba   = (Ilag_ba - I_ab) / dt;
+    IF[a*Nx+b] = if_ab;
+    IF[b*Nx+a] = if_ba;
+
+    if (full) {
+      double Ilag_dI = cmi_with_prebuilt(sZ, sB[a], sB[b], k);
+      double di_val  = (Ilag_dI - I_ab) / dt;
+      dI[a*Nx+b]   = dI[b*Nx+a]   = di_val;
+      Leak[a*Nx+b] = Leak[b*Nx+a] = di_val - if_ab - if_ba;
+    }
+  }
+
+  if (full) return py::make_tuple(IF_map, Leak_map, dI_map);
+  return IF_map;
+}
+
+
+// ============================================================
 // Unified dispatcher — routes based on mask and full flag
 // ============================================================
 py::object information_flow_causal_map_dispatcher(
@@ -565,7 +831,8 @@ py::object information_flow_causal_map_dispatcher(
     py::object tau_obj,
     py::object mask_obj,
     double dt, int k, int n_threads,
-    bool full)
+    bool full,
+    py::object Z_obj)
 {
   // Broadcast scalar tau to a per-variable array
   py::array_t<int, py::array::c_style> tau_arr;
@@ -586,6 +853,13 @@ py::object information_flow_causal_map_dispatcher(
     for (py::ssize_t i = 1; i < t.shape(0); ++i)
       if (t(i) != t(0))
         throw std::invalid_argument("information_flow_causal_map requires the same tau for all variables");
+    if (t.shape(0) > 0 && t(0) < 0)
+      throw std::invalid_argument("tau must be non-negative");
+  }
+
+  if (!Z_obj.is_none()) {
+    int tau = (tau_arr.size() > 0) ? tau_arr.at(0) : 0;
+    return information_flow_causal_map_cond_wrapper(X_obj, Z_obj, mask_obj, tau, dt, k, n_threads, full);
   }
 
   if (full) {
