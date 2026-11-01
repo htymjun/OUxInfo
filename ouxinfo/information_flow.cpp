@@ -80,7 +80,9 @@ T mi_with_prebuilt_x(
       cy = (int)rs.count;
     }
 
-    if (cx > 0 && cy > 0) {
+    // Every point contributes, including n_x = 0 or n_y = 0 (legitimate for k = 1);
+    // only degenerate points with eps == 0 (duplicates) are skipped.
+    if (eps > 0) {
       sum_psi_nX += digamma(cx + 1.0);
       sum_psi_nY += digamma(cy + 1.0);
       ++valid_pts;
@@ -575,6 +577,15 @@ py::object information_flow_causal_map_dispatcher(
     tau_arr = py::array_t<int>({Nx});
     auto buf = tau_arr.mutable_unchecked<1>();
     for (int i = 0; i < Nx; ++i) buf(i) = tau_val;
+  }
+
+  // Every code path assumes one common delay (several read only tau[0]); reject
+  // per-variable delays instead of silently returning path-dependent results.
+  {
+    auto t = tau_arr.unchecked<1>();
+    for (py::ssize_t i = 1; i < t.shape(0); ++i)
+      if (t(i) != t(0))
+        throw std::invalid_argument("information_flow_causal_map requires the same tau for all variables");
   }
 
   if (full) {
