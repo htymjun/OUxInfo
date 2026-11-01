@@ -66,7 +66,9 @@ Blue circles show \(T_{x\to y}\) (Horowitz–Esposito information flow in the ca
 
 Passing a conditioning series `Z` to `information_flow` or `information_flow_causal_map` replaces every mutual information by a conditional mutual information (Frenzel–Pompe KSG estimator):
 
-$$T_{x\to y|z} = \frac{I(x_t; y_{t+\tau} \mid z_t) - I(x_t; y_t \mid z_t)}{\Delta t}$$
+$$T_{x\to y|z} = \frac{I(x_t; y_{t+\tau} \mid z_t) - I(x_t; y_t \mid z_t)}{\tau\,\Delta t}$$
+
+where \(\Delta t\) is the sampling step; every rate in OUxInfo is divided by \(\tau\,\Delta t\).
 
 Linear Gaussian chain \(x \to w \to y\) without a direct link:
 

@@ -59,8 +59,9 @@ The finite check tests the exponent bits, because -ffinite-math-only lets the co
 
 ## Open questions (not changed)
 
-- Every rate is divided by `dt`, not `tau * dt`; with tau > 1 the result is per lag, not per
-  unit time, unless the caller passes dt = tau Δt.
+- Resolved in the following commit: every rate (IF, IF maps incl. dI and Leak, TE, TE map,
+  entropy_rate, and therefore TEIFL, flux1d and backward TE) is now divided by `tau * dt`
+  with dt the sampling step; tau >= 1 is required.
 - Tied data: skipping eps = 0 points keeps mostly-continuous data usable but returns a
   plausible-looking number for heavily quantized data; the alternative is NaN as soon as any
   point has eps = 0.

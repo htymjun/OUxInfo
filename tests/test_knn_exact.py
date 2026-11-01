@@ -111,7 +111,7 @@ def test_information_flow_and_maps_match_brute_force():
     for j in range(3):
       if i != j:
         xi, xj = X[i].reshape(-1, 1), X[j].reshape(-1, 1)
-        ref[j, i] = (_ksg1(xi[:m], xj[tau:], k) - _ksg1(xi[:m], xj[:m], k)) / dt
+        ref[j, i] = (_ksg1(xi[:m], xj[tau:], k) - _ksg1(xi[:m], xj[:m], k)) / (tau * dt)
   off = ~np.eye(3, dtype=bool)
   x0, x1 = X[0].reshape(-1, 1), X[1].reshape(-1, 1)
   assert information_flow(x0, x1, tau=tau, dt=dt, k=k) == pytest.approx(ref[1, 0], abs=1e-10)

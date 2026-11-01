@@ -19,9 +19,9 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   X : ndarray of shape (N, Nt) or (N, Nt, dim)
       Multivariate time series. N variables, Nt time steps, optional dim dimensions.
   tau : int, optional
-      Time delay (in samples). Default 1.
+      Time delay (in samples, >= 1). Default 1.
   dt : float, optional
-      Physical time step. Default 1.0.
+      Physical time step between samples; rates are divided by tau * dt. Default 1.0.
   lag : int, optional
       Time lag for embedding. Default 1.
   max_m : int, optional

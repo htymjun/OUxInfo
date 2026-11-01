@@ -1,7 +1,7 @@
 """Conditional information flow (optional Z argument of information_flow and
 information_flow_causal_map).
 
-  T_{X->Y|Z} = [I(X_t; Y_{t+tau} | Z_t) - I(X_t; Y_t | Z_t)] / dt
+  T_{X->Y|Z} = [I(X_t; Y_{t+tau} | Z_t) - I(X_t; Y_t | Z_t)] / (tau dt)
 
 Checks, from exact to statistical:
   1. agreement with an exhaustive-distance KSG reference (all code paths),
@@ -23,7 +23,7 @@ def _c(a):
 
 def _cond_if_ref(x, y, z, tau, dt, k):
   m = len(x) - tau
-  return (_cmi(x[:m], y[tau:], z[:m], k) - _cmi(x[:m], y[:m], z[:m], k)) / dt
+  return (_cmi(x[:m], y[tau:], z[:m], k) - _cmi(x[:m], y[:m], z[:m], k)) / (tau * dt)
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def _exact_cond_if(A, tau, cond, dt=1.0):
   V = np.block([[S, C.T], [C, S]])                        # (s_t, s_{t+tau})
   # I(X_t; Y_t | Z_t) = 0 when Y_t is part of Z_t
   second = 0.0 if 1 in cond else _gaussian_cmi(V, [0], [1], cond)
-  return (_gaussian_cmi(V, [0], [d + 1], cond) - second) / dt
+  return (_gaussian_cmi(V, [0], [d + 1], cond) - second) / (tau * dt)
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ def test_conditional_causal_maps_match_brute_force(dx, dz, z_1d):
     for j in range(Nx):
       if i != j:
         IF_ref[j, i] = _cond_if_ref(X[i], X[j], W, tau, dt, k)
-        dI_ref[i, j] = (_cmi(X[i, tau:], X[j, tau:], W[:m], k) - _cmi(X[i, :m], X[j, :m], W[:m], k)) / dt
+        dI_ref[i, j] = (_cmi(X[i, tau:], X[j, tau:], W[:m], k) - _cmi(X[i, :m], X[j, :m], W[:m], k)) / (tau * dt)
   Leak_ref = dI_ref - IF_ref - IF_ref.T
 
   X_in = _c(X[:, :, 0]) if dx == 1 else X
@@ -137,7 +137,7 @@ def test_conditioning_on_target_gives_transfer_entropy(tau, k):
   # conditional transfer entropy I(X_t; Y_{t+tau} | Y_t, W_t)
   m = len(x) - tau
   yw = _c(np.hstack([y, w]))
-  cte = conditional_mutual_info(x[:m], _c(y[tau:]), _c(yw[:m]), k=k) / dt
+  cte = conditional_mutual_info(x[:m], _c(y[tau:]), _c(yw[:m]), k=k) / (tau * dt)
   assert information_flow(x, y, tau=tau, dt=dt, k=k, Z=yw) == pytest.approx(cte, abs=1e-12)
 
   IF_map = information_flow_causal_map(_c(s[:, :2].T), tau, dt=dt, k=k, Z=y)

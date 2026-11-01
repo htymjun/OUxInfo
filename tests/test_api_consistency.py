@@ -53,7 +53,9 @@ def test_invalid_arguments_raise():
   X = rng.standard_normal((2, 100))
   tau2 = np.ones(2, dtype=np.int32)
   for call in (lambda: transfer_entropy(x, x, m=0), lambda: transfer_entropy(x, x, m=2, lag=0),
-               lambda: transfer_entropy(x, x, tau=-1),
+               lambda: transfer_entropy(x, x, tau=-1), lambda: transfer_entropy(x, x, tau=0),
+               lambda: information_flow(x, x, tau=0), lambda: information_flow_causal_map(X, 0),
+               lambda: transfer_entropy_causal_map(X, 0 * tau2),
                lambda: transfer_entropy_causal_map(X, -tau2), lambda: transfer_entropy_causal_map(X, tau2, m=0),
                lambda: entropy_rate(x, tau=0),
                lambda: TEIFL(X, max_m=1, multi=True)):
@@ -148,3 +150,23 @@ def test_duplicates_and_unclipped_kl():
   kl = [KL_div(rng.standard_normal((500, 1)), rng.standard_normal((500, 1))) for _ in range(20)]
   assert min(kl) < 0.0                                            # was clipped to 0, biasing the mean
   assert abs(np.mean(kl)) < 0.05
+
+
+def test_rates_are_divided_by_tau_dt():
+  """Every rate is per unit time: Delta / (tau * dt), with dt the sampling step."""
+  rng = np.random.default_rng(10)
+  n, tau, dt = 3000, 3, 0.2
+  X = np.zeros((2, n))
+  for t in range(n - 1):
+    X[0, t + 1] = 0.8 * X[0, t] + rng.standard_normal()
+    X[1, t + 1] = 0.5 * X[1, t] + 0.6 * X[0, t] + rng.standard_normal()
+  x, y = X[0].reshape(-1, 1), X[1].reshape(-1, 1)
+  m = n - tau
+  dI = mutual_info(x[:m], y[tau:]) - mutual_info(x[:m], y[:m])
+  assert information_flow(x, y, tau=tau, dt=dt) == pytest.approx(dI / (tau * dt), abs=1e-12)
+  assert information_flow_causal_map(X, tau, dt=dt)[1, 0] == pytest.approx(dI / (tau * dt), abs=1e-12)
+  te = conditional_mutual_info(x[:m], np.ascontiguousarray(y[tau:]), y[:m])
+  assert transfer_entropy(x, y, tau=tau, dt=dt) == pytest.approx(te / (tau * dt), abs=1e-12)
+  assert transfer_entropy_causal_map(X, np.full(2, tau, dtype=np.int32), dt=dt)[1, 0] == pytest.approx(te / (tau * dt), abs=1e-12)
+  dH = shannon_entropy(x[tau:]) - shannon_entropy(x[:-tau])
+  assert entropy_rate(x, tau=tau, dt=dt) == pytest.approx(dH / (tau * dt), abs=1e-12)

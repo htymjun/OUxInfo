@@ -88,9 +88,9 @@ def information_flow_1d(data, dt=1.0, tau=1, k=5, n_jobs=1):
         Spatiotemporal data. data[i, :] or data[:, i, :] is the time series at spatial cell i.
         Must be float64 (or convertible).
     dt : float, optional
-        Physical time step between samples. Default 1.0.
+        Physical time step between samples; rates are divided by tau * dt. Default 1.0.
     tau : int, optional
-        Time delay. Default 1.
+        Time delay (in samples, >= 1). Default 1.
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
     n_jobs : int, optional
@@ -161,9 +161,9 @@ def information_flow_2d(data, dt=1.0, tau=1, k=5, n_jobs=1, x1=None, x2=None):
         Spatiotemporal data. data[j,i,:] or data[:,j,i,:] is the time series at spatial cell (i,j).
         Must be float64 (or convertible).
     dt : float, optional
-        Physical time step between samples. Default 1.0.
+        Physical time step between samples; rates are divided by tau * dt. Default 1.0.
     tau : int, optional
-        Time delay. Default 1.
+        Time delay (in samples, >= 1). Default 1.
     k : int, optional
         Number of nearest neighbours for the KSG estimator. Default 5.
     n_jobs : int, optional

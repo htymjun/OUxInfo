@@ -102,7 +102,7 @@ T mi_with_prebuilt_x(
 
 
 // ============================================================
-// Information flow  dI/dt ≈ (MI(X, Y_shifted) − MI(X, Y)) / dt
+// Information flow  dI/dt ≈ (MI(X, Y_shifted) − MI(X, Y)) / (tau dt)
 //
 // X marginal is built once and shared between both MI calls,
 // avoiding the duplicate O(Neff log Neff) construction present
@@ -129,7 +129,7 @@ T information_flow(T* X, T* Y, int tau, T dt, int k, int dx, int dy, int N) {
 
   T Ilag = mi_with_prebuilt_x(X, Z, k, dx, dy, Neff, sa_X_ptr, idx_X_ptr);
   T I    = mi_with_prebuilt_x(X, Y, k, dx, dy, Neff, sa_X_ptr, idx_X_ptr);
-  return (Ilag - I) / dt;
+  return (Ilag - I) / (tau * dt);
 }
 
 
@@ -244,7 +244,7 @@ T cmi_with_prebuilt(const CountSpace<T>& sZ, const CountSpace<T>& sXZ,
 
 // ============================================================
 // Conditional information flow
-//   dI_{X->Y|Z} ≈ (I(X_t; Y_{t+tau} | Z_t) − I(X_t; Y_t | Z_t)) / dt
+//   dI_{X->Y|Z} ≈ (I(X_t; Y_{t+tau} | Z_t) − I(X_t; Y_t | Z_t)) / (tau dt)
 //
 // The Z and XZ spaces are shared between both CMI calls.
 // ============================================================
@@ -262,7 +262,7 @@ T conditional_information_flow(const T* X, const T* Y, const T* Z, int tau, T dt
 
   T Ilag = cmi_with_prebuilt(sZ, sXZ, sYlagZ, k);
   T I    = cmi_with_prebuilt(sZ, sXZ, sYZ,    k);
-  return (Ilag - I) / dt;
+  return (Ilag - I) / (tau * dt);
 }
 
 
@@ -346,9 +346,9 @@ py::object information_flow_causal_map_wrapper(
       double Ilag_ij = mi_with_prebuilt_x(xj, xi + tau, k, 1, 1, Neff, &sa_vars[j],     no_kd);
       double Ilag_dI = mi_with_prebuilt_x(xi + tau, xj + tau, k, 1, 1, Neff, &sa_lag_vars[i], no_kd);
 
-      double if_ji    = (Ilag_ji - I_ij) / dt;
-      double if_ij    = (Ilag_ij - I_ij) / dt;
-      double di_val   = (Ilag_dI - I_ij) / dt;
+      double if_ji    = (Ilag_ji - I_ij) / (tau * dt);
+      double if_ij    = (Ilag_ij - I_ij) / (tau * dt);
+      double di_val   = (Ilag_dI - I_ij) / (tau * dt);
       double leak_val = di_val - if_ji - if_ij;
 
       IF[j*N+i]   = if_ji;
@@ -380,17 +380,17 @@ py::object information_flow_causal_map_wrapper(
 
       double *yi    = xj + tau_i * dx;
       double Ilag_ji = mutual_info(&xi, &yi, k, dx, dx, Neff_i);
-      IF[j*N+i] = (Ilag_ji - I_i) / dt;
+      IF[j*N+i] = (Ilag_ji - I_i) / (tau_i * dt);
 
       double I_j    = (tau_i == tau_j) ? I_i : mutual_info(&xj, &xi, k, dx, dx, Neff_j);
       double *yj    = xi + tau_j * dx;
       double Ilag_ij = mutual_info(&xj, &yj, k, dx, dx, Neff_j);
-      IF[i*N+j] = (Ilag_ij - I_j) / dt;
+      IF[i*N+j] = (Ilag_ij - I_j) / (tau_j * dt);
 
       double *xi_s  = xi + tau_i * dx;
       double *xj_s  = xj + tau_i * dx;
       double Ilag_xy = mutual_info(&xi_s, &xj_s, k, dx, dx, Neff_i);
-      dI[j*N+i] = dI[i*N+j] = (Ilag_xy - I_i) / dt;
+      dI[j*N+i] = dI[i*N+j] = (Ilag_xy - I_i) / (tau_i * dt);
     }
 
     // Leak: computed after IF and dI are fully written
@@ -506,9 +506,9 @@ py::object information_flow_causal_map_mask_wrapper(
     double Ilag_ba = mi_with_prebuilt_x(xa, xb + tau, k, 1, 1, Neff, &sa_vars[a],     no_kd);
     double Ilag_dI = mi_with_prebuilt_x(xb + tau, xa + tau, k, 1, 1, Neff, &sa_lag_vars[b], no_kd);
 
-    double if_ab    = (Ilag_ab - I_ab) / dt;
-    double if_ba    = (Ilag_ba - I_ab) / dt;
-    double di_val   = (Ilag_dI - I_ab) / dt;
+    double if_ab    = (Ilag_ab - I_ab) / (tau * dt);
+    double if_ba    = (Ilag_ba - I_ab) / (tau * dt);
+    double di_val   = (Ilag_dI - I_ab) / (tau * dt);
     double leak_val = di_val - if_ab - if_ba;
 
     IF[a*Nx+b]   = if_ab;
@@ -584,12 +584,12 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
 
     double *yi    = xj + tau_i * dx;
     double Ilag_ji = mutual_info(&xi, &yi, k, dx, dx, Neff_i);
-    IF[j*N+i] = (Ilag_ji - I_i) / dt;
+    IF[j*N+i] = (Ilag_ji - I_i) / (tau_i * dt);
 
     double I_j    = (tau_i == tau_j) ? I_i : mutual_info(&xj, &xi, k, dx, dx, Neff_j);
     double *yj    = xi + tau_j * dx;
     double Ilag_ij = mutual_info(&xj, &yj, k, dx, dx, Neff_j);
-    IF[i*N+j] = (Ilag_ij - I_j) / dt;
+    IF[i*N+j] = (Ilag_ij - I_j) / (tau_j * dt);
   }
 
   return IF_map;
@@ -686,8 +686,8 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
     double I_ab    = mi_with_prebuilt_x(xb, xa,       k, 1, 1, Neff, &sa_vars[b], no_kd);
     double Ilag_ab = mi_with_prebuilt_x(xb, xa + tau, k, 1, 1, Neff, &sa_vars[b], no_kd);
     double Ilag_ba = mi_with_prebuilt_x(xa, xb + tau, k, 1, 1, Neff, &sa_vars[a], no_kd);
-    IF[a*Nx+b] = (Ilag_ab - I_ab) / dt;
-    IF[b*Nx+a] = (Ilag_ba - I_ab) / dt;
+    IF[a*Nx+b] = (Ilag_ab - I_ab) / (tau * dt);
+    IF[b*Nx+a] = (Ilag_ba - I_ab) / (tau * dt);
   }
 
   return IF_map;
@@ -698,8 +698,8 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
 // Conditional causal map (optional mask)  →  IF_map or (IF, Leak, dI)
 //
 // Every MI of the unconditional map is replaced by a CMI given Z_t:
-//   IF[a, b] = (I(x_b,t; x_a,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / dt
-//   dI[a, b] = (I(x_a,t+tau; x_b,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / dt
+//   IF[a, b] = (I(x_b,t; x_a,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / (tau dt)
+//   dI[a, b] = (I(x_a,t+tau; x_b,t+tau | Z_t) − I(x_a,t; x_b,t | Z_t)) / (tau dt)
 //   Leak     = dI − IF[a, b] − IF[b, a]
 // Z is held at time t in every term, so Leak keeps its unconditional
 // meaning (the part of the joint change not split into the two flows).
@@ -808,14 +808,14 @@ py::object information_flow_causal_map_cond_wrapper(
     double I_ab    = cmi_with_prebuilt(sZ, sA[a], sA[b], k);
     double Ilag_ab = cmi_with_prebuilt(sZ, sA[b], sB[a], k);   // x_b,t vs x_a,t+tau
     double Ilag_ba = cmi_with_prebuilt(sZ, sA[a], sB[b], k);   // x_a,t vs x_b,t+tau
-    double if_ab   = (Ilag_ab - I_ab) / dt;
-    double if_ba   = (Ilag_ba - I_ab) / dt;
+    double if_ab   = (Ilag_ab - I_ab) / (tau * dt);
+    double if_ba   = (Ilag_ba - I_ab) / (tau * dt);
     IF[a*Nx+b] = if_ab;
     IF[b*Nx+a] = if_ba;
 
     if (full) {
       double Ilag_dI = cmi_with_prebuilt(sZ, sB[a], sB[b], k);
-      double di_val  = (Ilag_dI - I_ab) / dt;
+      double di_val  = (Ilag_dI - I_ab) / (tau * dt);
       dI[a*Nx+b]   = dI[b*Nx+a]   = di_val;
       Leak[a*Nx+b] = Leak[b*Nx+a] = di_val - if_ab - if_ba;
     }
@@ -869,8 +869,9 @@ py::object information_flow_causal_map_dispatcher(
     for (py::ssize_t i = 1; i < t.shape(0); ++i)
       if (t(i) != t(0))
         throw std::invalid_argument("information_flow_causal_map requires the same tau for all variables");
-    if (t.shape(0) > 0 && t(0) < 0)
-      throw std::invalid_argument("tau must be non-negative");
+    // the rates are divided by tau * dt
+    if (t.shape(0) > 0 && t(0) < 1)
+      throw std::invalid_argument("tau must be >= 1");
   }
 
   if (!Z_obj.is_none()) {

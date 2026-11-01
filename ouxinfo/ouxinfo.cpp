@@ -194,7 +194,7 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   lag   : int, optional
           Time lag for embedding
   dt    : double, optional
-          Physical time
+          Physical time step between samples (rates are divided by tau * dt)
   k     : int, optional
           Number of nearest neighbors.
   trial : int, optional
@@ -226,8 +226,8 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  if (tau < 0 || m < 1 || lag < 1) {
-    throw std::invalid_argument("tau must be >= 0, m >= 1 and lag >= 1");
+  if (tau < 1 || m < 1 || lag < 1) {
+    throw std::invalid_argument("tau must be >= 1, m >= 1 and lag >= 1");
   }
   int i_start = (m - 1) * lag;
   int Nt = N - tau - i_start;
@@ -270,7 +270,7 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
     }
     TEs /= static_cast<double>(trial);
   }
-  return (TE - TEs) / dt;
+  return (TE - TEs) / (tau * dt);
 }
 
 
@@ -285,7 +285,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   tau : int, optional
         Length of time delay
   dt  : double, optional
-        Physical time
+        Physical time step between samples (rates are divided by tau * dt)
   k   : int, optional
         Number of nearest neighbors.
   z   : ndarray (N, dim), optional
@@ -315,8 +315,8 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
-  if (tau < 0) {
-    throw std::invalid_argument("tau must be non-negative");
+  if (tau < 1) {
+    throw std::invalid_argument("tau must be >= 1");  // the rate is divided by tau * dt
   }
   if (z_obj.is_none()) {
     return information_flow<double>(x, y, tau, dt, k, dx, dy, N);
@@ -351,7 +351,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   lag       : int, optional
               Time lag for embedding
   dt        : double, optional
-              Physical time
+              Physical time step between samples (rates are divided by tau * dt)
   k         : int, optional
               Number of nearest neighbors.
   trial     : int, optional
@@ -391,8 +391,8 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   double *X = static_cast<double*>(info.ptr);
   int *tau_arr = static_cast<int*>(info_tau.ptr);
   for (int i = 0; i < N; i++)
-    if (tau_arr[i] < 0)
-      throw std::invalid_argument("tau must be non-negative");
+    if (tau_arr[i] < 1)
+      throw std::invalid_argument("tau must be >= 1");
   py::array_t<double> TE_map({N,N});
   py::buffer_info info_out = TE_map.request();
   double *TE = static_cast<double*>(info_out.ptr);
@@ -458,7 +458,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
           }
           TEs /= static_cast<double>(trial);
         }
-        TE[ji] = (TE_val - TEs) / dt;
+        TE[ji] = (TE_val - TEs) / (tau * dt);
       }
     }
   }
@@ -598,13 +598,13 @@ X : ndarray of shape (N, dim)
 Y : ndarray of shape (N, dim)
     Target time series. Must be float64.
 tau : int, optional
-    Time delay (in samples). Default 1.
+    Time delay (in samples, >= 1). Default 1.
 m : int, optional
     Embedding dimension for Y. Default 1.
 lag : int, optional
     Time lag for embedding. Default 1.
 dt : float, optional
-    Physical time step. Default 1.0.
+    Physical time step between samples; rates are divided by tau * dt. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
 trial : int, optional
@@ -615,7 +615,7 @@ seed : int, optional
 Returns
 -------
 value : float
-    Transfer entropy TE(X -> Y) in nats per dt. NaN if the number of
+    Transfer entropy TE(X -> Y) per unit time, in nats / (tau * dt). NaN if the number of
     usable samples, N - tau - (m - 1) * lag, is at most k.
 
 Notes
@@ -636,9 +636,9 @@ X : ndarray of shape (N, dim)
 Y : ndarray of shape (N, dim)
     Target time series. Must be float64.
 tau : int, optional
-    Time delay (in samples). Default 1.
+    Time delay (in samples, >= 1). Default 1.
 dt : float, optional
-    Physical time step. Default 1.0.
+    Physical time step between samples; rates are divided by tau * dt. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
 Z : ndarray of shape (N, dim_z), optional
@@ -649,7 +649,7 @@ Returns
 -------
 value : float
     Information flow T_{X->Y}: rate of change of I(X; Y) caused by the evolution of Y
-    with X held fixed (information flowing from X to Y), in nats per dt.
+    with X held fixed (information flowing from X to Y), in nats per unit time.
     NaN if N - tau <= k.
 
 Notes
@@ -660,12 +660,12 @@ Based on the decomposition
 
 The estimate is
 
-    T_{X->Y}   = [I(X_t; Y_{t+tau}) - I(X_t; Y_t)] / dt
-    T_{X->Y|Z} = [I(X_t; Y_{t+tau} | Z_t) - I(X_t; Y_t | Z_t)] / dt
+    T_{X->Y}   = [I(X_t; Y_{t+tau}) - I(X_t; Y_t)] / (tau dt)
+    T_{X->Y|Z} = [I(X_t; Y_{t+tau} | Z_t) - I(X_t; Y_t | Z_t)] / (tau dt)
 
 with t = 0, ..., N - tau - 1. The conditional mutual informations use the
 KSG estimator of Frenzel & Pompe (2007). With Z = Y, T_{X->Y|Z} equals the
-transfer entropy I(X_t; Y_{t+tau} | Y_t) / dt.
+transfer entropy I(X_t; Y_{t+tau} | Y_t) / (tau dt).
 
 See: Horowitz & Esposito (2014).
 )doc");
@@ -681,13 +681,13 @@ X : ndarray of shape (N, Nt) or (N, Nt, dim)
     Multivariate time series with N variables and Nt time steps.
     Must be float64.
 tau : ndarray of shape (N,), dtype int32
-    Time delay for each variable.
+    Time delay (in samples, >= 1) for each variable.
 m : int, optional
     Embedding dimension. Default 1.
 lag : int, optional
     Time lag for embedding. Default 1.
 dt : float, optional
-    Physical time step. Default 1.0.
+    Physical time step between samples; rates are divided by tau * dt. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
 trial : int, optional
@@ -736,7 +736,7 @@ Parameters common to both modes
 X : ndarray, float64
     Multivariate time series, one row per variable.
 dt : float, optional
-    Physical time step. Default 1.0.
+    Physical time step between samples; rates are divided by tau * dt. Default 1.0.
 k : int, optional
     Number of nearest neighbors. Default 5.
 n_threads : int, optional
@@ -764,8 +764,8 @@ Notes
 -----
 With Z, for each pair (i, j) and t = 0, ..., Nt - tau - 1,
 
-    IF_map[i, j] = [I(X_j,t; X_i,t+tau | Z_t) - I(X_j,t; X_i,t | Z_t)] / dt
-    dI_map[i, j] = [I(X_i,t+tau; X_j,t+tau | Z_t) - I(X_i,t; X_j,t | Z_t)] / dt
+    IF_map[i, j] = [I(X_j,t; X_i,t+tau | Z_t) - I(X_j,t; X_i,t | Z_t)] / (tau dt)
+    dI_map[i, j] = [I(X_i,t+tau; X_j,t+tau | Z_t) - I(X_i,t; X_j,t | Z_t)] / (tau dt)
     Leak_map     = dI_map - IF_map - IF_map.T
 
 Z is held at time t in every term, so dI_map is the change of I(X_i; X_j | Z_t)
