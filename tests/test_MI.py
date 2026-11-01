@@ -10,14 +10,15 @@ def test_mutual_info_gaussian_rho_dependence():
   np.random.seed(0)
   N = 10000
   sigma_x, sigma_y = 3.e0, 5.e0
-  # KSG MI estimator has large negative bias for weak correlations; reliable from rho≥0.6
-  for rho in np.linspace(0.6e0, 0.9e0, 5):
+  # single realization with N=1e4: the statistical error is ~0.01 nats, so the tolerance is
+  # an absolute 0.025 (~2.5 sd) plus 2 %; weak correlations are covered as well
+  for rho in np.linspace(0.1e0, 0.9e0, 9):
     cov = rho * sigma_x * sigma_y
     Cov = [[sigma_x**2, cov], [cov, sigma_y**2]]
     xy = np.random.multivariate_normal([0.e0, 0.e0], Cov, N)
     I_true = theoretical_mi_gaussian(rho)
     I_est = mutual_info(xy[:, 0].reshape(-1, 1), xy[:, 1].reshape(-1, 1), k=5)
-    tol = 0.10e0 * I_true
+    tol = 0.025e0 + 0.02e0 * I_true
     assert np.isclose(I_est, I_true, atol=tol), f"rho={rho:.2f}, est={I_est:.4f}, true={I_true:.4f}"
 
 
@@ -29,10 +30,10 @@ def test_mutual_info_knn_k_dependence():
   Cov = [[var_x, cov], [cov, var_y]]
   xy = np.random.multivariate_normal([0.e0, 0.e0], Cov, N)
   I_true = theoretical_mi_gaussian(rho)
-  # KSG bias grows with k; reliable up to k~14 for this sample size
-  for k in range(3, 15):
+  # same realization for every k; the statistical error is largest at k=1 (~0.017 nats)
+  for k in range(1, 31):
     I_est = mutual_info(xy[:, 0].reshape(-1, 1), xy[:, 1].reshape(-1, 1), k=k)
-    tol = 0.10e0 * I_true
+    tol = 0.02e0 + 0.02e0 * I_true
     assert np.isclose(I_est, I_true, atol=tol), f"k={k}, est={I_est:.4f}, true={I_true:.4f}"
 
 
@@ -42,7 +43,7 @@ def test_mutual_info_independent():
   x = np.random.normal(0.e0, 1.e0, N).reshape(-1, 1)
   y = np.random.normal(0.e0, 1.e0, N).reshape(-1, 1)
   I_est = mutual_info(x, y, k=5)
-  assert np.isclose(I_est, 0.e0, atol=0.05e0), f"est={I_est:.4f}, expected≈0"
+  assert np.isclose(I_est, 0.e0, atol=0.02e0), f"est={I_est:.4f}, expected≈0"
 
 
 def save_results():
@@ -61,7 +62,7 @@ def save_results():
   sigma_x, sigma_y = 3.e0, 5.e0
 
   # panel 1: MI vs rho
-  rhos = np.linspace(0.6e0, 0.9e0, 5)
+  rhos = np.linspace(0.1e0, 0.9e0, 9)
   I_true_r, I_est_r = [], []
   for rho in rhos:
     cov = rho * sigma_x * sigma_y
@@ -76,7 +77,7 @@ def save_results():
   Cov_k = [[sigma_x**2, cov_k], [cov_k, sigma_y**2]]
   xy_k = np.random.multivariate_normal([0.e0, 0.e0], Cov_k, N)
   I_true_k = theoretical_mi_gaussian(rho_k)
-  ks = list(range(3, 15))
+  ks = list(range(1, 31))
   I_est_k = [mutual_info(xy_k[:, 0].reshape(-1, 1), xy_k[:, 1].reshape(-1, 1), k=k) for k in ks]
 
   fig, axes = plt.subplots(1, 2, figsize=(12, 5))

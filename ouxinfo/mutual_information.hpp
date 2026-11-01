@@ -15,12 +15,7 @@ using namespace nanoflann;
 using boost::math::digamma;
 
 template <typename T>
-using my_kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
-  Chebyshev_Adaptor<T, PointCloud>,
-  PointCloud,
-  -1,
-  size_t
->;
+using my_kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
 
 
 // ============================================================
@@ -69,18 +64,32 @@ struct SortedArray1D {
     }
   }
 
+  // Index range [lo, hi) of the sorted values with |vals[j] - v| < eps.
+  // The binary search uses v -/+ eps, which is rounded; the edges are then re-tested
+  // in difference form so that the boundary point at distance exactly eps (the k-th
+  // neighbour) is excluded, as in the KSG definition.
+  void strictRange(T v, T eps, int& lo, int& hi) const {
+    const int n = (int)vals.size();
+    lo = (int)(std::upper_bound(vals.begin(), vals.end(), v - eps) - vals.begin());
+    hi = (int)(std::lower_bound(vals.begin(), vals.end(), v + eps) - vals.begin());
+    while (lo > 0 && std::abs(vals[lo-1] - v) < eps) --lo;
+    while (lo < n && !(std::abs(vals[lo] - v) < eps)) ++lo;
+    while (hi < n && std::abs(vals[hi] - v) < eps) ++hi;
+    while (hi > lo && !(std::abs(vals[hi-1] - v) < eps)) --hi;
+  }
+
   // Count points strictly within radius of v, excluding self (original index = self).
   int countStrict(T v, T eps, int self) const {
-    int lo = (int)(std::upper_bound(vals.begin(), vals.end(), v - eps) - vals.begin());
-    int hi = (int)(std::lower_bound(vals.begin(), vals.end(), v + eps) - vals.begin());
+    int lo, hi;
+    strictRange(v, eps, lo, hi);
     return hi - lo - 1;  // -1 excludes self
   }
 
   // Count with Theiler-window exclusion.
   // Subtract points j with |j - self| <= thei that happen to fall within the radius.
   int countTheiler(T v, T eps, int self, int thei, int N) const {
-    int lo  = (int)(std::upper_bound(vals.begin(), vals.end(), v - eps) - vals.begin());
-    int hi  = (int)(std::lower_bound(vals.begin(), vals.end(), v + eps) - vals.begin());
+    int lo, hi;
+    strictRange(v, eps, lo, hi);
     int cnt = hi - lo - 1;  // -1 excludes self
     // Scan the Theiler window and remove those inside the radius range
     int win_lo = std::max(0,   self - thei);
@@ -176,7 +185,9 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
       cy = (int)rs.count;
     }
 
-    if (cx > 0 && cy > 0) {
+    // Every point contributes, including n_x = 0 or n_y = 0 (legitimate for k = 1);
+    // only degenerate points with eps == 0 (duplicates) are skipped.
+    if (eps > 0) {
       sum_psi_nX += digamma(cx + 1.0);
       sum_psi_nY += digamma(cy + 1.0);
       ++valid_pts;
@@ -287,7 +298,9 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
         if (std::abs((int)m.first - i) > Thei && m.second < eps) ++cy;
     }
 
-    if (cx > 0 && cy > 0) {
+    // Every point contributes, including n_x = 0 or n_y = 0 (legitimate for k = 1);
+    // only degenerate points with eps == 0 (duplicates) are skipped.
+    if (eps > 0) {
       sum_psi_nX += digamma(cx + 1.0);
       sum_psi_nY += digamma(cy + 1.0);
       sum_psi_nN += digamma(nN_i + 1.0);
@@ -381,7 +394,7 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
     index_XZ.findNeighbors(rs_XZ, &XZ[i*dxz], SearchParameters(0, false));
     int cyz = (int)rs_YZ.count, cxz = (int)rs_XZ.count;
 
-    if (cz > 0 && cyz > 0 && cxz > 0) {
+    if (eps > 0) {
       sum_psi_nZ  += digamma(cz  + 1.0);
       sum_psi_nYZ += digamma(cyz + 1.0);
       sum_psi_nXZ += digamma(cxz + 1.0);

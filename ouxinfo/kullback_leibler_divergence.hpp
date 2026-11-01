@@ -11,11 +11,7 @@ using namespace nanoflann;
 
 
 template <typename T>
-using kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
-  Chebyshev_Adaptor<T, PointCloud>,
-  PointCloud,
-  -1
->;
+using kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
 
 
 // ============================================================

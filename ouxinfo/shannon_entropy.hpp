@@ -13,11 +13,7 @@ using boost::math::digamma;
 
 
 template <typename T>
-using kd_tree_t = nanoflann::KDTreeSingleIndexAdaptor<
-  Chebyshev_Adaptor<T, PointCloud>,
-  PointCloud,
-  -1
->;
+using kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
 
 
 // ============================================================
@@ -61,10 +57,10 @@ T shannon_entropy(T **X_ptr, int k, int d, int N) {
     mean_log_eps += local_sum;
 }
   mean_log_eps /= N;
-  // volume of unit ball C_d
-  T pi = acos(-1.e0);
-  T Cd = std::pow(pi, 0.5e0 * d) / std::tgamma(1.e0 + 0.5e0 * d) / std::pow(2.e0, d);
+  // eps is the diameter of the max-norm ball, whose volume is eps^d (c_d = 1).
+  // The Euclidean constant pi^{d/2}/Gamma(1+d/2)/2^d would be wrong here: the
+  // distances come from the Chebyshev tree (it coincides with 1 only for d = 1).
   // Shannon entropy
-  T H = - digamma(k) + digamma(N) + std::log(Cd) + d * mean_log_eps;
+  T H = - digamma(k) + digamma(N) + d * mean_log_eps;
   return H;
 }
