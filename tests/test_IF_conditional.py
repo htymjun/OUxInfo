@@ -230,7 +230,7 @@ def test_conditional_input_validation():
     information_flow(x, y, Z=rng.standard_normal(200))        # must be 2D like X and Y
   with pytest.raises(RuntimeError):
     information_flow(x, y, Z=np.zeros((200, 0)))
-  with pytest.raises(RuntimeError):
+  with pytest.raises(ValueError):
     information_flow(x, y, tau=-1)
   X = rng.standard_normal((3, 200))
   with pytest.raises(RuntimeError):

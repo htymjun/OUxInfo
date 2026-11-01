@@ -4,6 +4,7 @@
 #include "adaptor.hpp"
 #include <cmath>
 #include <vector>
+#include <limits>
 #include <omp.h>
 
 
@@ -19,7 +20,8 @@ using kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
 // ============================================================
 template<typename T>
 T KL_div(T **X_ptr, T **Y_ptr, int k, int d, int N_X, int N_Y) {
-  if (N_X == 0 || N_Y == 0) return 0.e0;
+  // k-th neighbour within X (excluding the point itself) and within Y
+  if (N_X <= k || N_Y < k) return std::numeric_limits<T>::quiet_NaN();
   T *X = *X_ptr;
   T *Y = *Y_ptr;
 

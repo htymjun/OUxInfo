@@ -5,6 +5,7 @@
 #include <boost/math/special_functions/digamma.hpp>
 #include <cmath>
 #include <vector>
+#include <limits>
 #include <omp.h>
 
 
@@ -21,7 +22,7 @@ using kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
 // ============================================================
 template <typename T>
 T shannon_entropy(T **X_ptr, int k, int d, int N) {
-  if (N == 0) return 0.e0;
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   // KDTree
   T *X = *X_ptr;
   PointCloud cloud;

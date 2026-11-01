@@ -28,6 +28,7 @@ double shannon_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, in
   double
     Shannon entropy.
   */
+  check_knn_k(k);
   py::buffer_info info = x_obj.request();
   if (info.ndim != 2) {
     throw std::runtime_error("Input dimension must be 2");
@@ -56,6 +57,7 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
   double
     KL divergence.
   */
+  check_knn_k(k);
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -89,6 +91,7 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   double
     mutual information.
   */
+  check_knn_k(k);
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -107,6 +110,9 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
   double I;
+  if (Thei < 0) {
+    throw std::invalid_argument("Thei must be non-negative");
+  }
   if (Thei == 0) {
     I = mutual_info(&x, &y, k, dx, dy, N);
   }
@@ -133,6 +139,7 @@ double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x
   double
     conditional mutual information.
   */
+  check_knn_k(k);
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   py::buffer_info info_z = z_obj.request();
@@ -185,6 +192,7 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   double
     transfer entropy.
   */
+  check_knn_k(k);
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -269,6 +277,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   double
     information flow.
   */
+  check_knn_k(k);
   py::buffer_info info_x = x_obj.request();
   py::buffer_info info_y = y_obj.request();
   if (info_x.ndim != 2 || info_y.ndim != 2) {
@@ -287,7 +296,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
   if (tau < 0) {
-    throw std::runtime_error("tau must be non-negative");
+    throw std::invalid_argument("tau must be non-negative");
   }
   if (z_obj.is_none()) {
     return information_flow<double>(x, y, tau, dt, k, dx, dy, N);
@@ -336,6 +345,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   double
     transfer entropy causal map.
   */
+  check_knn_k(k);
   py::buffer_info info     = X_obj.request();
   py::buffer_info info_tau = tau_obj.request();
   // error messages
@@ -450,7 +460,7 @@ k : int, optional
 Returns
 -------
 value : float
-    Shannon entropy in nats.
+    Shannon entropy in nats. NaN if N <= k (no k-th neighbor).
 
 Notes
 -----
@@ -473,7 +483,7 @@ k : int, optional
 Returns
 -------
 value : float
-    KL divergence D_KL(X || Y) in nats.
+    KL divergence D_KL(X || Y) in nats. NaN if N <= k or M < k.
 
 Notes
 -----
@@ -497,7 +507,9 @@ Thei : int, optional
 Returns
 -------
 value : float
-    Mutual information I(X; Y) in nats.
+    Mutual information I(X; Y) in nats. NaN if N <= k, or with a Theiler
+    window if N < k + 2 * Thei + 1 (some points then have fewer than k
+    admissible neighbors).
 
 Notes
 -----
@@ -521,7 +533,7 @@ k : int, optional
 Returns
 -------
 value : float
-    Conditional mutual information I(X; Y | Z) in nats.
+    Conditional mutual information I(X; Y | Z) in nats. NaN if N <= k.
 
 Notes
 -----
@@ -554,7 +566,8 @@ trial : int, optional
 Returns
 -------
 value : float
-    Transfer entropy TE(X -> Y) in nats per dt.
+    Transfer entropy TE(X -> Y) in nats per dt. NaN if the number of
+    usable samples, N - tau - (m - 1) * lag, is at most k.
 
 Notes
 -----
@@ -586,6 +599,7 @@ Returns
 -------
 value : float
     Information flow dI_X (rate of mutual information change due to X) in nats per dt.
+    NaN if N - tau <= k.
 
 Notes
 -----
@@ -633,6 +647,7 @@ Returns
 -------
 value : ndarray of shape (N, N)
     Causal map where entry [i, j] is TE(X_j -> X_i).
+    Diagonal entries, and entries with at most k usable samples, are NaN.
 )doc");
   m.def("information_flow_causal_map", &information_flow_causal_map_dispatcher,
         py::arg("X"),
@@ -685,6 +700,7 @@ When full=False : ndarray of shape (N, N)
 When full=True : tuple of three ndarray of shape (N, N)
     (IF_map, Leak_map, dI_map).  IF_map[i, j] = IF from X_j to X_i.
     Diagonal entries are NaN.  Unmasked entries are 0 (masked mode).
+Computed entries are NaN if Nt - tau <= k (no k-th neighbor).
 
 Notes
 -----

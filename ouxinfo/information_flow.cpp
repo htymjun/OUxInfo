@@ -25,7 +25,7 @@ T mi_with_prebuilt_x(
     const SortedArray1D<T>*  sa_X,
     const my_kd_tree_t<T>*  idx_X)
 {
-  if (N == 0) return T(0);
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   int dxy = dx + dy;
 
   std::vector<T> XY(N * dxy);
@@ -105,7 +105,7 @@ T mi_with_prebuilt_x(
 // ============================================================
 template<typename T>
 T information_flow(T* X, T* Y, int tau, T dt, int k, int dx, int dy, int N) {
-  if (N <= tau) return T(0);
+  if (N - tau <= k) return std::numeric_limits<T>::quiet_NaN();
   int Neff = N - tau;
   T*  Z    = Y + tau * dy;
 
@@ -248,7 +248,7 @@ T cmi_with_prebuilt(const CountSpace<T>& sZ, const CountSpace<T>& sXZ,
 template<typename T>
 T conditional_information_flow(const T* X, const T* Y, const T* Z, int tau, T dt, int k,
                                int dx, int dy, int dz, int N) {
-  if (N <= tau) return T(0);
+  if (N - tau <= k) return std::numeric_limits<T>::quiet_NaN();
   int Neff = N - tau;
 
   CountSpace<T> sZ, sXZ, sYZ, sYlagZ;
@@ -834,6 +834,8 @@ py::object information_flow_causal_map_dispatcher(
     bool full,
     py::object Z_obj)
 {
+  check_knn_k(k);
+
   // Broadcast scalar tau to a per-variable array
   py::array_t<int, py::array::c_style> tau_arr;
   if (py::isinstance<py::array>(tau_obj)) {

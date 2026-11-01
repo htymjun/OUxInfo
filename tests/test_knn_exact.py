@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 from scipy.special import digamma
 from ouxinfo import (shannon_entropy, KL_div, mutual_info, conditional_mutual_info,
-                     information_flow, information_flow_causal_map)
+                     information_flow, information_flow_causal_map, transfer_entropy,
+                     transfer_entropy_causal_map)
 
 
 def _cheb(a, b):
@@ -119,6 +120,58 @@ def test_information_flow_and_maps_match_brute_force():
       out = information_flow_causal_map(np.ascontiguousarray(X), tau, mask=mask, dt=dt, k=k, full=full)
       IF = out[0] if full else out
       np.testing.assert_allclose(IF[off], ref[off], atol=1e-10)
+
+
+@pytest.mark.parametrize("k", [1, 5])
+def test_too_few_samples_give_nan(k):
+  """With N <= k there is no k-th neighbour; the estimators used to return 0 (MI family),
+  -inf (entropy) or a stale value (KL) instead of NaN. N = k + 1 is the smallest valid size."""
+  rng = np.random.default_rng(k)
+  sample = lambda n: rng.standard_normal((n, 1))
+  for n, invalid in ((k, True), (k + 1, False)):
+    x, y, z = sample(n), sample(n), sample(n)
+    vals = [shannon_entropy(x, k=k), KL_div(x, sample(n), k=k), mutual_info(x, y, k=k),
+            conditional_mutual_info(x, y, z, k=k)]
+    assert np.all(np.isnan(vals)) if invalid else np.all(np.isfinite(vals)), (n, vals)
+
+  # KL also needs k points in Y
+  assert np.isnan(KL_div(sample(50), sample(k - 1), k=k))
+  assert np.isfinite(KL_div(sample(50), sample(k), k=k))
+
+  # Theiler window: the middle point has N - (2 Thei + 1) admissible neighbours
+  thei = 3
+  n0 = k + 2 * thei + 1
+  assert np.isnan(mutual_info(sample(n0 - 1), sample(n0 - 1), k=k, Thei=thei))
+  assert np.isfinite(mutual_info(sample(n0), sample(n0), k=k, Thei=thei))
+
+  # time-lagged estimators: N - tau usable samples (also covers N <= tau)
+  tau, off = 2, ~np.eye(3, dtype=bool)
+  for n, invalid in ((1, True), (k + tau, True), (k + tau + 1, False)):
+    x, y, z = sample(n), sample(n), sample(n)
+    X = rng.standard_normal((3, n))
+    vals = [information_flow(x, y, tau=tau, k=k), information_flow(x, y, tau=tau, k=k, Z=z),
+            transfer_entropy_causal_map(X, np.full(3, tau, dtype=np.int32), k=k)[off]]
+    if n > tau:
+      vals.append(transfer_entropy(x, y, tau=tau, k=k))
+    for full in (False, True):
+      for mask in (None, off):
+        out = information_flow_causal_map(X, tau, mask=mask, k=k, full=full)
+        vals += [m[off] for m in (out if full else (out,))]
+    vals = np.concatenate([np.ravel(v) for v in vals])
+    assert np.all(np.isnan(vals)) if invalid else np.all(np.isfinite(vals)), (n, vals)
+
+
+def test_invalid_k_and_theiler_window_raise():
+  x = np.random.default_rng(0).standard_normal((100, 1))
+  X = np.ascontiguousarray(x.reshape(2, 50))
+  for call in (lambda: shannon_entropy(x, k=0), lambda: KL_div(x, x, k=0),
+               lambda: mutual_info(x, x, k=0), lambda: conditional_mutual_info(x, x, x, k=0),
+               lambda: transfer_entropy(x, x, k=0), lambda: information_flow(x, x, k=0),
+               lambda: transfer_entropy_causal_map(X, np.ones(2, dtype=np.int32), k=0),
+               lambda: information_flow_causal_map(X, 1, k=0),
+               lambda: mutual_info(x, x, Thei=-1)):
+    with pytest.raises(ValueError):
+      call()
 
 
 def test_causal_map_rejects_per_variable_tau():

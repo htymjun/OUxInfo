@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <numeric>
 #include <iostream> // for std::cerr, std::cout
+#include <limits>
+#include <stdexcept>
 #include <omp.h>
 
 
@@ -16,6 +18,13 @@ using boost::math::digamma;
 
 template <typename T>
 using my_kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
+
+
+// k-NN estimators need k >= 1.  With fewer than k + 1 samples there is no k-th
+// neighbour (the result buffer is never filled) and the estimators return NaN.
+inline void check_knn_k(int k) {
+  if (k < 1) throw std::invalid_argument("k must be >= 1");
+}
 
 
 // ============================================================
@@ -109,7 +118,7 @@ struct SortedArray1D {
 // ============================================================
 template<typename T>
 T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
-  if (N == 0) return T(0);
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   T *X = *X_ptr;
   T *Y = *Y_ptr;
   int dxy = dx + dy;
@@ -206,7 +215,9 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
 // ============================================================
 template<typename T>
 T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei) {
-  if (N == 0) return T(0);
+  // The point in the middle of the series has the fewest samples outside its window,
+  // N - (2*Thei + 1); below k it has no k-th neighbour.
+  if (N < k + 2 * Thei + 1) return std::numeric_limits<T>::quiet_NaN();
   T *X = *X_ptr;
   T *Y = *Y_ptr;
   int dxy = dx + dy;
@@ -320,6 +331,7 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
 // ============================================================
 template<typename T>
 T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy, int dz, int N) {
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   T *X = *x_ptr;
   T *Y = *y_ptr;
   T *Z = *z_ptr;

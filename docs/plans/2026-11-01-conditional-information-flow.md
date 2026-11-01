@@ -35,7 +35,7 @@ Consequences used as exact checks:
   strict Chebyshev radius counts (sorted array in 1-D, exact `ChebyshevKDTree` otherwise).
 - `cmi_with_prebuilt(sZ, sXZ, sYZ, k)`: KSG / Frenzel–Pompe CMI; the joint XYZ points are
   assembled from sXZ and the Y part of sYZ, so joint and marginal spaces cannot disagree.
-  Returns NaN when N <= k (the unconditional path reads an unset k-th distance there).
+  Returns NaN when N <= k (see "Too few samples" below).
 - `conditional_information_flow`: shares the Z and XZ spaces between both CMIs.
 - `information_flow_causal_map_cond_wrapper`: one routine for mask / no mask, `full`, and
   2-D or 3-D X. Per-variable spaces (x_v,t, Z_t) and (x_v,t+tau, Z_t) and the Z_t space are
@@ -87,3 +87,28 @@ N = 1e4; at N = 1e5 every |bias| <= 0.0016 nats. Quantities from the same case s
 simulated series, so their z values are correlated. The unconditional estimator (validated
 before) shows the same size of deviation, so the conditional path adds no visible bias
 beyond the usual KSG finite-sample bias in the larger joint space.
+
+## Too few samples (follow-up, same day)
+
+With N <= k the k-NN result buffer is never filled. Because it is zero-initialized, every
+point had eps = 0 and was skipped, so mutual_info, conditional_mutual_info,
+transfer_entropy, information_flow and all causal maps silently returned 0.0
+(indistinguishable from independence); shannon_entropy returned -inf and KL_div inf or a
+stale distance. information_flow also returned 0 for N <= tau, and Theiler-window MI with
+N < k + 2 Thei + 1 dropped the middle points (no k admissible neighbours) and returned a
+biased value. k = 0 made KL_div read out_dist[-1].
+
+Now every core estimator returns NaN when it has no k-th neighbour:
+
+| estimator | NaN if |
+|---|---|
+| shannon_entropy, mutual_info, conditional_mutual_info | N <= k |
+| mutual_info with Thei > 0 | N < k + 2 Thei + 1 |
+| KL_div | N_X <= k or N_Y < k |
+| information_flow (with or without Z), IF maps | N - tau <= k |
+| transfer_entropy, TE map | N - tau - (m - 1) lag <= k |
+
+k < 1 and Thei < 0 raise ValueError; negative tau in information_flow now raises ValueError
+(was RuntimeError). Values at N = k + 1 match the exhaustive-distance reference (< 1e-15).
+Tests: test_knn_exact.py::test_too_few_samples_give_nan,
+test_invalid_k_and_theiler_window_raise.
