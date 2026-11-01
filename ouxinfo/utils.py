@@ -31,7 +31,7 @@ def auto_mutual_info(x, taumax, k=5):
   Returns:
   --------
   tau_list : np.ndarray
-    Array of lags from 0 to taumax.
+    Array of lags from 1 to taumax.
   mi_list : np.ndarray
     Array of mutual information values corresponding to each tau.
   optimal_tau : int or None
@@ -54,6 +54,6 @@ def auto_mutual_info(x, taumax, k=5):
   optimal_tau = None
   for i in range(1, len(mi_list) - 1):
     if mi_list[i] < mi_list[i - 1] and mi_list[i] < mi_list[i + 1]:
-      optimal_tau = i
+      optimal_tau = int(tau_list[i])  # mi_list[i] belongs to lag tau_list[i] = i + 1
       break
   return np.array(tau_list), np.array(mi_list), optimal_tau

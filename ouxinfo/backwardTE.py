@@ -12,13 +12,13 @@ def backward_transfer_entropy(x, y, tau=1, m=1, lag=1, dt=1.e0, k=5, trial=0):
   y : ndarray of shape (N, dim)
       Target time series. Must be float64.
   tau : int, optional
-      Time delay (in samples). Default 1.
+      Time delay (in samples, >= 1). Default 1.
   m : int, optional
       Embedding dimension for y. Default 1.
   lag : int, optional
       Time lag for embedding. Default 1.
   dt : float, optional
-      Physical time step. Default 1.0.
+      Physical time step between samples; rates are divided by tau * dt. Default 1.0.
   k : int, optional
       Number of nearest neighbors. Default 5.
   trial : int, optional
@@ -33,6 +33,6 @@ def backward_transfer_entropy(x, y, tau=1, m=1, lag=1, dt=1.e0, k=5, trial=0):
   y_ = y.reshape(-1,1) if y.ndim == 1 else y
   xb = np.ascontiguousarray(x_[::-1,:])
   yb = np.ascontiguousarray(y_[::-1,:])
-  BTE = transfer_entropy(xb, yb, tau=tau, m=m, lag=lag, dt=dt, k=k, trial=1)
+  BTE = transfer_entropy(xb, yb, tau=tau, m=m, lag=lag, dt=dt, k=k, trial=trial)
   return BTE
 

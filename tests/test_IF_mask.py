@@ -27,7 +27,7 @@ def _analytical_if_gaussian_ar(a, b, c_xy, tau=1, dt=1.0, sigma=1.0):
     Gamma_tau = np.linalg.matrix_power(A, tau) @ Sigma
     rho_0   = Sigma[1, 0]     / np.sqrt(S_xx * S_yy)
     rho_tau = Gamma_tau[1, 0] / np.sqrt(S_xx * S_yy)
-    return (-0.5 * np.log(1.0 - rho_tau**2) - (-0.5 * np.log(1.0 - rho_0**2))) / dt
+    return (-0.5 * np.log(1.0 - rho_tau**2) - (-0.5 * np.log(1.0 - rho_0**2))) / (tau * dt)
 
 
 # ---------------------------------------------------------------------------

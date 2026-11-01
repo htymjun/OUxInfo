@@ -8,6 +8,11 @@
 #include <algorithm>
 #include <numeric>
 #include <iostream> // for std::cerr, std::cout
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <cstring>
+#include <cstdint>
 #include <omp.h>
 
 
@@ -16,6 +21,43 @@ using boost::math::digamma;
 
 template <typename T>
 using my_kd_tree_t = ChebyshevKDTree<T, PointCloud, size_t>;
+
+
+// k-NN estimators need k >= 1.  With fewer than k + 1 samples there is no k-th
+// neighbour (the result buffer is never filled) and the estimators return NaN.
+inline void check_knn_k(int k) {
+  if (k < 1) throw std::invalid_argument("k must be >= 1");
+}
+
+// NaN breaks the strict weak ordering std::sort needs (out-of-bounds reads) and inf makes
+// |x_i - x_i| NaN, so non-finite input is rejected.  The exponent-bit test is used because
+// -Ofast (-ffinite-math-only) lets the compiler fold std::isfinite() to true.
+inline void check_finite(const double* p, size_t n, const char* name) {
+  for (size_t i = 0; i < n; i++) {
+    uint64_t bits;
+    std::memcpy(&bits, p + i, sizeof bits);
+    if ((bits & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)
+      throw std::invalid_argument(std::string(name) + " contains NaN or inf");
+  }
+}
+
+// A zero-dimensional point set has no kd-tree (nanoflann indexes an empty bounding box).
+inline void check_dim(long long d, const char* name) {
+  if (d < 1) throw std::invalid_argument(std::string(name) + " must have at least one column");
+}
+
+// Sets the OpenMP thread count for one call and restores the previous value afterwards,
+// so that n_threads of a causal map does not leak into later calls.
+struct OmpThreadGuard {
+  int prev;
+  explicit OmpThreadGuard(int n) : prev(omp_get_max_threads()) {
+    if (n < 1) throw std::invalid_argument("n_threads must be >= 1");
+    omp_set_num_threads(n);
+  }
+  ~OmpThreadGuard() { omp_set_num_threads(prev); }
+  OmpThreadGuard(const OmpThreadGuard&) = delete;
+  OmpThreadGuard& operator=(const OmpThreadGuard&) = delete;
+};
 
 
 // ============================================================
@@ -109,23 +151,22 @@ struct SortedArray1D {
 // ============================================================
 template<typename T>
 T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
-  if (N == 0) return T(0);
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   T *X = *X_ptr;
   T *Y = *Y_ptr;
   int dxy = dx + dy;
 
   // --- Joint XY data ---
-  std::vector<T> XY(N * dxy);
+  std::vector<T> XY((size_t)N * dxy);
   for (int i = 0; i < N; i++) {
-    for (int j = 0; j < dx; j++) XY[i*dxy+j]    = X[i*dx+j];
-    for (int j = 0; j < dy; j++) XY[i*dxy+dx+j] = Y[i*dy+j];
+    for (int j = 0; j < dx; j++) XY[(size_t)i*dxy+j]    = X[(size_t)i*dx+j];
+    for (int j = 0; j < dy; j++) XY[(size_t)i*dxy+dx+j] = Y[(size_t)i*dy+j];
   }
 
   // --- Joint XY kd-tree (always needed) ---
   PointCloud cloud_XY;
   cloud_XY.N = N; cloud_XY.dim = dxy; cloud_XY.pts = XY.data();
   my_kd_tree_t<T> index_XY(dxy, cloud_XY, KDTreeSingleIndexAdaptorParams(10));
-  index_XY.buildIndex();
 
   // --- X marginal: sorted array for 1D, kd-tree for >1D ---
   SortedArray1D<T> sa_X;
@@ -136,7 +177,6 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   } else {
     cloud_X.N = N; cloud_X.dim = dx; cloud_X.pts = X;
     idx_X = std::make_unique<my_kd_tree_t<T>>(dx, cloud_X, KDTreeSingleIndexAdaptorParams(10));
-    idx_X->buildIndex();
   }
 
   // --- Y marginal: sorted array for 1D, kd-tree for >1D ---
@@ -148,7 +188,6 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
   } else {
     cloud_Y.N = N; cloud_Y.dim = dy; cloud_Y.pts = Y;
     idx_Y = std::make_unique<my_kd_tree_t<T>>(dy, cloud_Y, KDTreeSingleIndexAdaptorParams(10));
-    idx_Y->buildIndex();
   }
 
   T   sum_psi_nX = 0, sum_psi_nY = 0;
@@ -162,7 +201,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
     // --- XY space kNN (Chebyshev) ---
     KNNResultSet<T> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist.data());
-    index_XY.findNeighbors(resultSet, &XY[i * dxy], SearchParameters(0, false));
+    index_XY.findNeighbors(resultSet, &XY[(size_t)i*dxy], SearchParameters(0, false));
     T eps = out_dist[k];
 
     // --- X marginal radius count ---
@@ -171,7 +210,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
       cx = sa_X.countStrict(X[i], eps, i);
     } else {
       StrictRadiusCountSet<T> rs(eps, (size_t)i);
-      idx_X->findNeighbors(rs, &X[i*dx], SearchParameters(0, false));
+      idx_X->findNeighbors(rs, &X[(size_t)i*dx], SearchParameters(0, false));
       cx = (int)rs.count;
     }
 
@@ -181,7 +220,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
       cy = sa_Y.countStrict(Y[i], eps, i);
     } else {
       StrictRadiusCountSet<T> rs(eps, (size_t)i);
-      idx_Y->findNeighbors(rs, &Y[i*dy], SearchParameters(0, false));
+      idx_Y->findNeighbors(rs, &Y[(size_t)i*dy], SearchParameters(0, false));
       cy = (int)rs.count;
     }
 
@@ -194,7 +233,7 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
     }
   }
   }
-  T I = T(0);
+  T I = std::numeric_limits<T>::quiet_NaN();  // stays NaN if every point had eps == 0
   if (valid_pts > 0)
     I = digamma(k) - sum_psi_nX/valid_pts - sum_psi_nY/valid_pts + digamma(N);
   return I;
@@ -206,23 +245,24 @@ T mutual_info(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N) {
 // ============================================================
 template<typename T>
 T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei) {
-  if (N == 0) return T(0);
+  // The point in the middle of the series has the fewest samples outside its window,
+  // N - (2*Thei + 1); below k it has no k-th neighbour.
+  if ((long long)N < (long long)k + 2LL * Thei + 1) return std::numeric_limits<T>::quiet_NaN();
   T *X = *X_ptr;
   T *Y = *Y_ptr;
   int dxy = dx + dy;
 
   // --- Joint XY data ---
-  std::vector<T> XY(N * dxy);
+  std::vector<T> XY((size_t)N * dxy);
   for (int i = 0; i < N; i++) {
-    for (int j = 0; j < dx; j++) XY[i*dxy+j]    = X[i*dx+j];
-    for (int j = 0; j < dy; j++) XY[i*dxy+dx+j] = Y[i*dy+j];
+    for (int j = 0; j < dx; j++) XY[(size_t)i*dxy+j]    = X[(size_t)i*dx+j];
+    for (int j = 0; j < dy; j++) XY[(size_t)i*dxy+dx+j] = Y[(size_t)i*dy+j];
   }
 
   // --- Joint XY kd-tree ---
   PointCloud cloud_XY;
   cloud_XY.N = N; cloud_XY.dim = dxy; cloud_XY.pts = XY.data();
   my_kd_tree_t<T> index_XY(dxy, cloud_XY, KDTreeSingleIndexAdaptorParams(10));
-  index_XY.buildIndex();
 
   // --- X marginal ---
   SortedArray1D<T> sa_X;
@@ -233,7 +273,6 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
   } else {
     cloud_X.N = N; cloud_X.dim = dx; cloud_X.pts = X;
     idx_X = std::make_unique<my_kd_tree_t<T>>(dx, cloud_X, KDTreeSingleIndexAdaptorParams(10));
-    idx_X->buildIndex();
   }
 
   // --- Y marginal ---
@@ -245,10 +284,9 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
   } else {
     cloud_Y.N = N; cloud_Y.dim = dy; cloud_Y.pts = Y;
     idx_Y = std::make_unique<my_kd_tree_t<T>>(dy, cloud_Y, KDTreeSingleIndexAdaptorParams(10));
-    idx_Y->buildIndex();
   }
 
-  size_t num_search = std::min((size_t)N, (size_t)(k + 2 * Thei + 1));
+  size_t num_search = (size_t)(k + 2 * Thei + 1);  // <= N, so no overflow after the check above
 
   T   sum_psi_nX = 0, sum_psi_nY = 0, sum_psi_nN = 0;
   int valid_pts  = 0;
@@ -264,7 +302,7 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
     int nN_i = N - (window_end - window_start);
 
     // --- find k-th XY neighbor outside the Theiler window ---
-    size_t num_results = index_XY.knnSearch(&XY[i*dxy], num_search,
+    size_t num_results = index_XY.knnSearch(&XY[(size_t)i*dxy], num_search,
                                             ret_index.data(), out_dist.data());
     T eps = T(0);
     int valid_k_count = 0;
@@ -280,7 +318,7 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
       cx = sa_X.countTheiler(X[i], eps, i, Thei, N);
     } else {
       std::vector<nanoflann::ResultItem<size_t,T>> matches;
-      idx_X->radiusSearch(&X[i*dx], eps, matches, nanoflann::SearchParameters(0, false));
+      idx_X->radiusSearch(&X[(size_t)i*dx], eps, matches, nanoflann::SearchParameters(0, false));
       cx = 0;
       for (const auto& m : matches)
         if (std::abs((int)m.first - i) > Thei && m.second < eps) ++cx;
@@ -292,7 +330,7 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
       cy = sa_Y.countTheiler(Y[i], eps, i, Thei, N);
     } else {
       std::vector<nanoflann::ResultItem<size_t,T>> matches;
-      idx_Y->radiusSearch(&Y[i*dy], eps, matches, nanoflann::SearchParameters(0, false));
+      idx_Y->radiusSearch(&Y[(size_t)i*dy], eps, matches, nanoflann::SearchParameters(0, false));
       cy = 0;
       for (const auto& m : matches)
         if (std::abs((int)m.first - i) > Thei && m.second < eps) ++cy;
@@ -308,7 +346,7 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
     }
   }
   }
-  T I = T(0);
+  T I = std::numeric_limits<T>::quiet_NaN();  // stays NaN if every point had eps == 0
   if (valid_pts > 0)
     I = digamma(k) - sum_psi_nX/valid_pts - sum_psi_nY/valid_pts + sum_psi_nN/valid_pts;
   return I;
@@ -320,28 +358,28 @@ T mutual_info_Thei(T **X_ptr, T **Y_ptr, int k, int dx, int dy, int N, int Thei)
 // ============================================================
 template<typename T>
 T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy, int dz, int N) {
+  if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   T *X = *x_ptr;
   T *Y = *y_ptr;
   T *Z = *z_ptr;
   int dxyz = dx + dy + dz; int dyz = dy + dz; int dxz = dx + dz;
 
   // --- Joint data XYZ, YZ, XZ ---
-  std::vector<T> XYZ(N * dxyz), YZ(N * dyz), XZ(N * dxz);
+  std::vector<T> XYZ((size_t)N * dxyz), YZ((size_t)N * dyz), XZ((size_t)N * dxz);
   for (int i = 0; i < N; i++) {
-    for (int j = 0; j < dx; j++) XYZ[i*dxyz+j]       = X[i*dx+j];
-    for (int j = 0; j < dy; j++) XYZ[i*dxyz+dx+j]    = Y[i*dy+j];
-    for (int j = 0; j < dz; j++) XYZ[i*dxyz+dx+dy+j] = Z[i*dz+j];
-    for (int j = 0; j < dy; j++) YZ[i*dyz+j]          = Y[i*dy+j];
-    for (int j = 0; j < dz; j++) YZ[i*dyz+dy+j]       = Z[i*dz+j];
-    for (int j = 0; j < dx; j++) XZ[i*dxz+j]          = X[i*dx+j];
-    for (int j = 0; j < dz; j++) XZ[i*dxz+dx+j]       = Z[i*dz+j];
+    for (int j = 0; j < dx; j++) XYZ[(size_t)i*dxyz+j]       = X[(size_t)i*dx+j];
+    for (int j = 0; j < dy; j++) XYZ[(size_t)i*dxyz+dx+j]    = Y[(size_t)i*dy+j];
+    for (int j = 0; j < dz; j++) XYZ[(size_t)i*dxyz+dx+dy+j] = Z[(size_t)i*dz+j];
+    for (int j = 0; j < dy; j++) YZ[(size_t)i*dyz+j]          = Y[(size_t)i*dy+j];
+    for (int j = 0; j < dz; j++) YZ[(size_t)i*dyz+dy+j]       = Z[(size_t)i*dz+j];
+    for (int j = 0; j < dx; j++) XZ[(size_t)i*dxz+j]          = X[(size_t)i*dx+j];
+    for (int j = 0; j < dz; j++) XZ[(size_t)i*dxz+dx+j]       = Z[(size_t)i*dz+j];
   }
 
   // --- XYZ kd-tree (always needed) ---
   PointCloud cloud_XYZ;
   cloud_XYZ.N = N; cloud_XYZ.dim = dxyz; cloud_XYZ.pts = XYZ.data();
   my_kd_tree_t<T> index_XYZ(dxyz, cloud_XYZ, KDTreeSingleIndexAdaptorParams(10));
-  index_XYZ.buildIndex();
 
   // --- Z marginal: sorted array for 1D, kd-tree for >1D ---
   SortedArray1D<T> sa_Z;
@@ -352,7 +390,6 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
   } else {
     cloud_Z.N = N; cloud_Z.dim = dz; cloud_Z.pts = Z;
     idx_Z = std::make_unique<my_kd_tree_t<T>>(dz, cloud_Z, KDTreeSingleIndexAdaptorParams(10));
-    idx_Z->buildIndex();
   }
 
   // --- YZ and XZ always use kd-trees (joint dimension > 1D in typical use) ---
@@ -361,8 +398,6 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
   cloud_XZ.N = N; cloud_XZ.dim = dxz; cloud_XZ.pts = XZ.data();
   my_kd_tree_t<T> index_YZ(dyz, cloud_YZ, KDTreeSingleIndexAdaptorParams(10));
   my_kd_tree_t<T> index_XZ(dxz, cloud_XZ, KDTreeSingleIndexAdaptorParams(10));
-  index_YZ.buildIndex();
-  index_XZ.buildIndex();
 
   T   sum_psi_nZ = 0, sum_psi_nXZ = 0, sum_psi_nYZ = 0;
   int valid_pts  = 0;
@@ -375,7 +410,7 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
     // --- XYZ space kNN (Chebyshev) ---
     KNNResultSet<T> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist.data());
-    index_XYZ.findNeighbors(resultSet, &XYZ[i * dxyz], SearchParameters(0, false));
+    index_XYZ.findNeighbors(resultSet, &XYZ[(size_t)i*dxyz], SearchParameters(0, false));
     T eps = out_dist[k];
 
     // --- Z marginal radius count ---
@@ -384,14 +419,14 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
       cz = sa_Z.countStrict(Z[i], eps, i);
     } else {
       StrictRadiusCountSet<T> rs(eps, (size_t)i);
-      idx_Z->findNeighbors(rs, &Z[i*dz], SearchParameters(0, false));
+      idx_Z->findNeighbors(rs, &Z[(size_t)i*dz], SearchParameters(0, false));
       cz = (int)rs.count;
     }
 
     // --- YZ and XZ radius counts ---
     StrictRadiusCountSet<T> rs_YZ(eps, (size_t)i), rs_XZ(eps, (size_t)i);
-    index_YZ.findNeighbors(rs_YZ, &YZ[i*dyz], SearchParameters(0, false));
-    index_XZ.findNeighbors(rs_XZ, &XZ[i*dxz], SearchParameters(0, false));
+    index_YZ.findNeighbors(rs_YZ, &YZ[(size_t)i*dyz], SearchParameters(0, false));
+    index_XZ.findNeighbors(rs_XZ, &XZ[(size_t)i*dxz], SearchParameters(0, false));
     int cyz = (int)rs_YZ.count, cxz = (int)rs_XZ.count;
 
     if (eps > 0) {
@@ -402,7 +437,7 @@ T conditional_mutual_info(T **x_ptr, T **y_ptr, T **z_ptr, int k, int dx, int dy
     }
   }
   }
-  T I = T(0);
+  T I = std::numeric_limits<T>::quiet_NaN();  // stays NaN if every point had eps == 0
   if (valid_pts > 0)
     I = digamma(k) + sum_psi_nZ/valid_pts - sum_psi_nXZ/valid_pts - sum_psi_nYZ/valid_pts;
   return I;

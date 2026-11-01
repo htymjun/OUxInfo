@@ -13,7 +13,7 @@ def _analytical_if_gaussian_ar(a, b, c_xy, tau=1, dt=1.0, sigma=1.0):
   rho_tau = Gamma_tau[1, 0] / np.sqrt(S_xx * S_yy)
   I_0   = -0.5e0 * np.log(1.0e0 - rho_0**2)
   I_tau = -0.5e0 * np.log(1.0e0 - rho_tau**2)
-  return (I_tau - I_0) / dt
+  return (I_tau - I_0) / (tau * dt)
 
 
 def _gaussian_ar_system(nt, a, b, c_xy, sigma, rng):

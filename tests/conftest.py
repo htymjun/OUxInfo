@@ -7,8 +7,9 @@ def pytest_sessionfinish(session, exitstatus):
     from test_KL     import save_results as _kl
     from test_MI     import save_results as _mi
     from test_IF     import save_results as _if
+    from test_IF_conditional import save_results as _ifc
     from test_TE     import save_results as _te
     from test_flux1d import save_results as _flux1d
     from test_ksg_kraskov import save_results as _kraskov
-    for fn in [_h, _kl, _mi, _if, _te, _flux1d, _kraskov]:
+    for fn in [_h, _kl, _mi, _if, _ifc, _te, _flux1d, _kraskov]:
         fn()
