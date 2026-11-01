@@ -36,6 +36,7 @@ double shannon_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, in
   if (info.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info, "X");
   double *x = static_cast<double*>(info.ptr);
   int N = static_cast<int>(info.shape[0]);
   int d = static_cast<int>(info.shape[1]);
@@ -66,11 +67,16 @@ double KL_div_wrapper(py::array_t<double, py::array::c_style> x_obj,
   if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info_x, "X");
+  check_samples(info_y, "Y");
   double *x = static_cast<double*>(info_x.ptr);
   double *y = static_cast<double*>(info_y.ptr);
   int N = static_cast<int>(info_x.shape[0]);
   int M = static_cast<int>(info_y.shape[0]);
   int d = static_cast<int>(info_x.shape[1]);
+  if (info_y.shape[1] != d) {
+    throw std::runtime_error("X and Y must have the same dimension");
+  }
   return KL_div(&x, &y, k, d, N, M);
 }
 
@@ -100,6 +106,8 @@ double mutual_info_wrapper(py::array_t<double, py::array::c_style> x_obj,
   if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info_x, "X");
+  check_samples(info_y, "Y");
   double *x = static_cast<double*>(info_x.ptr);
   double *y = static_cast<double*>(info_y.ptr);
   int N = static_cast<int>(info_x.shape[0]);
@@ -149,8 +157,11 @@ double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x
   if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double) || info_z.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info_x, "X");
+  check_samples(info_y, "Y");
   double *x = static_cast<double*>(info_x.ptr);
   double *y = static_cast<double*>(info_y.ptr);
+  check_samples(info_z, "Z");
   double *z = static_cast<double*>(info_z.ptr);
   int Nx = static_cast<int>(info_x.shape[0]);
   int Ny = static_cast<int>(info_y.shape[0]);
@@ -169,7 +180,8 @@ double conditional_mutual_info_wrapper(py::array_t<double, py::array::c_style> x
 
 double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj, 
                                 py::array_t<double, py::array::c_style> y_obj,
-                                int tau=1, int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0){
+                                int tau=1, int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0,
+                                int seed=-1){
   /*
   Parameters
   ----------
@@ -187,6 +199,8 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
           Number of nearest neighbors.
   trial : int, optional
           The number of trials for surrogate analysis.
+  seed  : int, optional
+          Seed of the surrogate shuffles; negative = random.
   Returns
   -------
   double
@@ -201,6 +215,8 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info_x, "X");
+  check_samples(info_y, "Y");
   double *x = static_cast<double*>(info_x.ptr);
   double *y = static_cast<double*>(info_y.ptr);
   int N = static_cast<int>(info_x.shape[0]);
@@ -210,6 +226,9 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   int dx = static_cast<int>(info_x.shape[1]);
   int dy = static_cast<int>(info_y.shape[1]);
+  if (tau < 0 || m < 1 || lag < 1) {
+    throw std::invalid_argument("tau must be >= 0, m >= 1 and lag >= 1");
+  }
   int i_start = (m - 1) * lag;
   int Nt = N - tau - i_start;
   if (Nt <= 0) {
@@ -217,35 +236,34 @@ double transfer_entropy_wrapper(py::array_t<double, py::array::c_style> x_obj,
   }
   // Y history
   int dy_past = m * dy;
-  std::vector<double> y_past_data(Nt * dy_past);
+  std::vector<double> y_past_data((size_t)Nt * dy_past);
   double *y_past = y_past_data.data();
   for (int i = 0; i < Nt; ++i) {
     int current_time = i_start + i;
     for (int j = 0; j < m; ++j) {
       int past_time = current_time - j * lag;
-      std::copy(y + past_time * dy,
-                y + past_time * dy + dy,
-                y_past + i * dy_past + j * dy);
+      std::copy(y + (size_t)past_time * dy,
+                y + (size_t)past_time * dy + dy,
+                y_past + (size_t)i * dy_past + j * dy);
     }
   }
   // offset x & z
-  double *x_valid = x + i_start * dx;
-  double *z_valid = y + (i_start + tau) * dy;
+  double *x_valid = x + (size_t)i_start * dx;
+  double *z_valid = y + (size_t)(i_start + tau) * dy;
   double TE  = conditional_mutual_info(&x_valid, &z_valid, &y_past, k, dx, dy, dy_past, Nt); // I(X^n;Y^{n+tau}|Y^n)
   double TEs = 0.e0;
   if (trial > 0) {
     std::vector<int> idx(Nt);
     std::iota(idx.begin(), idx.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::vector<double> xs_data(Nt * dx);
+    std::mt19937 g(seed >= 0 ? static_cast<unsigned>(seed) : std::random_device{}());
+    std::vector<double> xs_data((size_t)Nt * dx);
     for (int itr = 0; itr < trial; itr++) {
       std::shuffle(idx.begin(), idx.end(), g);
       for (int i = 0; i < Nt; ++i) {
-        int original_idx = idx[i];
+        size_t original_idx = idx[i];
         std::copy(x_valid + (original_idx * dx),
                   x_valid + (original_idx * dx) + dx,
-                  xs_data.begin() + (i * dx));
+                  xs_data.begin() + ((size_t)i * dx));
       }
       double *xs_ptr = xs_data.data();
       TEs += conditional_mutual_info(&xs_ptr, &z_valid, &y_past, k, dx, dy, dy_past, Nt); // I(Xs^n:Y^{n+tau}|Y^n)
@@ -286,6 +304,8 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   if (info_x.itemsize != sizeof(double) || info_y.itemsize != sizeof(double)) {
     throw std::runtime_error("Expected float64");
   }
+  check_samples(info_x, "X");
+  check_samples(info_y, "Y");
   double *x = static_cast<double*>(info_x.ptr);
   double *y = static_cast<double*>(info_y.ptr);
   int N = static_cast<int>(info_x.shape[0]);
@@ -309,11 +329,9 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
   if (info_z.shape[0] != N) {
     throw std::runtime_error("Input argument must be the same length");
   }
+  check_samples(info_z, "Z");
   const double *z = static_cast<const double*>(info_z.ptr);
   int dz = static_cast<int>(info_z.shape[1]);
-  if (dz < 1) {
-    throw std::runtime_error("Z must have at least one column");
-  }
   return conditional_information_flow<double>(x, y, z, tau, dt, k, dx, dy, dz, N);
 }
 
@@ -321,7 +339,7 @@ double information_flow_wrapper(py::array_t<double, py::array::c_style> x_obj,
 py::array_t<double> transfer_entropy_causal_map_wrapper(
   py::array_t<double, py::array::c_style> X_obj,
   py::array_t<int,    py::array::c_style> tau_obj,
-  int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0, int n_threads=1){
+  int m=1, int lag=1, double dt=1.e0, int k=5, int trial=0, int n_threads=1, int seed=1234){
   /*
   Parameters
   ----------
@@ -340,6 +358,8 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
               The number of trials for surrogate analysis.
   n_threads : int, optional
               The number of threads used for OpenMP.
+  seed      : int, optional
+              Seed of the surrogate shuffles (combined with the pair index).
   Returns
   -------
   double
@@ -363,9 +383,16 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   int dx = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;
   if (info_tau.shape[0] != N)
     throw std::runtime_error("tau length must equal N");
+  if (m < 1 || lag < 1)
+    throw std::invalid_argument("m must be >= 1 and lag >= 1");
+  if (info.ndim == 3) check_dim(info.shape[2], "X");
+  check_finite(static_cast<const double*>(info.ptr), (size_t)info.size, "X");
   // pointer
   double *X = static_cast<double*>(info.ptr);
   int *tau_arr = static_cast<int*>(info_tau.ptr);
+  for (int i = 0; i < N; i++)
+    if (tau_arr[i] < 0)
+      throw std::invalid_argument("tau must be non-negative");
   py::array_t<double> TE_map({N,N});
   py::buffer_info info_out = TE_map.request();
   double *TE = static_cast<double*>(info_out.ptr);
@@ -373,25 +400,25 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
   int dx_past = m * dx;
   int i_start = (m-1) * lag;
   // main loop
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
   #pragma omp parallel
   {
-    std::mt19937 rng(omp_get_thread_num() + 1234);
-    std::vector<double> xj_past_data(Nt * dx_past);
-    std::vector<double> xs_data(Nt * dx);
+    std::vector<double> xj_past_data((size_t)Nt * dx_past);
+    std::vector<double> xs_data((size_t)Nt * dx);
     std::vector<int> idx(Nt);
     #pragma omp for schedule(dynamic)
     for (int j = 0; j < N; j++) {
-      double *xj = X + j * Nt * dx;
+      double *xj = X + (size_t)j * Nt * dx;
       for (int i = 0; i < N; i++) {
+        size_t ji = (size_t)j * N + i;
         if (i == j) {
-          TE[j*N + i] = std::numeric_limits<double>::quiet_NaN();
+          TE[ji] = std::numeric_limits<double>::quiet_NaN();
           continue;
         }
         int tau = tau_arr[i];
         int Neff = Nt - tau - i_start;
         if (Neff <= 0) {
-          TE[j*N+i] = std::numeric_limits<double>::quiet_NaN();
+          TE[ji] = std::numeric_limits<double>::quiet_NaN();
           continue;
         }
         // Target History
@@ -400,27 +427,30 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
           int current_time = i_start + n;
           for (int m_idx = 0; m_idx < m; ++m_idx) {
             int past_time = current_time - m_idx * lag;
-            std::copy(xj + past_time * dx,
-                      xj + past_time * dx + dx,
-                      xj_past + n * dx_past + m_idx * dx);
+            std::copy(xj + (size_t)past_time * dx,
+                      xj + (size_t)past_time * dx + dx,
+                      xj_past + (size_t)n * dx_past + m_idx * dx);
           }
         }
         // offset
-        double *xi = X + i * Nt * dx;
-        double *xi_valid = xi + i_start * dx;
-        double *z_valid  = xj + (i_start + tau) * dx;
+        double *xi = X + (size_t)i * Nt * dx;
+        double *xi_valid = xi + (size_t)i_start * dx;
+        double *z_valid  = xj + (size_t)(i_start + tau) * dx;
         // I(X^n;Y^{n+tau}|Y^past)
         double TE_val = conditional_mutual_info(&xi_valid, &z_valid, &xj_past, k, dx, dx, dx_past, Neff);
         double TEs = 0.0;
         if (trial > 0) {
+          // seeded per pair, so the result does not depend on thread scheduling
+          std::seed_seq seq{static_cast<unsigned>(seed), static_cast<unsigned>(j), static_cast<unsigned>(i)};
+          std::mt19937 rng(seq);
           std::iota(idx.begin(), idx.begin() + Neff, 0);
           for (int itr = 0; itr < trial; ++itr) {
             std::shuffle(idx.begin(), idx.begin() + Neff, rng);
             for (int t = 0; t < Neff; ++t) {
-              int original_idx = idx[t];
+              size_t original_idx = idx[t];
               std::copy(xi_valid + (original_idx * dx),
                         xi_valid + (original_idx * dx) + dx,
-                        xs_data.begin() + (t * dx));
+                        xs_data.begin() + ((size_t)t * dx));
             }
             double *xs_ptr = xs_data.data();
             // I(X^n;Y^{n+tau}|Y^past)
@@ -428,7 +458,7 @@ py::array_t<double> transfer_entropy_causal_map_wrapper(
           }
           TEs /= static_cast<double>(trial);
         }
-        TE[j*N + i] = (TE_val - TEs) / dt;
+        TE[ji] = (TE_val - TEs) / dt;
       }
     }
   }
@@ -461,6 +491,10 @@ Returns
 -------
 value : float
     Shannon entropy in nats. NaN if N <= k (no k-th neighbor).
+    Points whose k-th neighbor distance is 0 (k or more duplicates) are
+    left out of the average; NaN if no point is left. Ties (quantized or
+    clipped data) bias the estimate even when no point is left out; add
+    low-amplitude noise to such data (Kraskov et al. 2004).
 
 Notes
 -----
@@ -484,6 +518,10 @@ Returns
 -------
 value : float
     KL divergence D_KL(X || Y) in nats. NaN if N <= k or M < k.
+    The estimate is not clipped at 0 and can be slightly negative.
+    Points with a zero neighbor distance in X or Y are left out of the
+    average; NaN if no point is left. Ties bias the estimate; add
+    low-amplitude noise to quantized data.
 
 Notes
 -----
@@ -507,7 +545,12 @@ Thei : int, optional
 Returns
 -------
 value : float
-    Mutual information I(X; Y) in nats. NaN if N <= k, or with a Theiler
+    Mutual information I(X; Y) in nats.
+    Points whose k-th neighbor distance is 0 (k or more duplicates) are
+    left out of the average; NaN if no point is left. Ties (quantized or
+    clipped data) bias the estimate even when no point is left out; add
+    low-amplitude noise to such data (Kraskov et al. 2004).
+    NaN if N <= k, or with a Theiler
     window if N < k + 2 * Thei + 1 (some points then have fewer than k
     admissible neighbors).
 
@@ -534,6 +577,10 @@ Returns
 -------
 value : float
     Conditional mutual information I(X; Y | Z) in nats. NaN if N <= k.
+    Points whose k-th neighbor distance is 0 (k or more duplicates) are
+    left out of the average; NaN if no point is left. Ties (quantized or
+    clipped data) bias the estimate even when no point is left out; add
+    low-amplitude noise to such data (Kraskov et al. 2004).
 
 Notes
 -----
@@ -541,7 +588,7 @@ Uses KSG estimator type 1. See: Kraskov et al. (2004).
 )doc");
   m.def("transfer_entropy", &transfer_entropy_wrapper,
         py::arg("X"), py::arg("Y"), py::arg("tau")=1, py::arg("m")=1, py::arg("lag")=1,
-        py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0,
+        py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0, py::arg("seed")=-1,
         R"doc(Compute transfer entropy from X to Y using the KSG estimator.
 
 Parameters
@@ -562,6 +609,8 @@ k : int, optional
     Number of nearest neighbors. Default 5.
 trial : int, optional
     Number of surrogate trials for significance testing. Default 0.
+seed : int, optional
+    Seed of the surrogate shuffles. Negative (default) draws a random seed.
 
 Returns
 -------
@@ -571,7 +620,8 @@ value : float
 
 Notes
 -----
-Computed as conditional mutual information: TE = I(Y_{t+tau}; X_t^(m) | Y_t^(m)).
+Computed as conditional mutual information: TE = I(X_t; Y_{t+tau} | Y_t^(m)),
+with Y_t^(m) = (Y_t, Y_{t-lag}, ..., Y_{t-(m-1)lag}). The source is not embedded.
 See: Schreiber (2000), Kraskov et al. (2004).
 )doc");
   m.def("information_flow", &information_flow_wrapper,
@@ -598,7 +648,8 @@ Z : ndarray of shape (N, dim_z), optional
 Returns
 -------
 value : float
-    Information flow dI_X (rate of mutual information change due to X) in nats per dt.
+    Information flow T_{X->Y}: rate of change of I(X; Y) caused by the evolution of Y
+    with X held fixed (information flowing from X to Y), in nats per dt.
     NaN if N - tau <= k.
 
 Notes
@@ -621,6 +672,7 @@ See: Horowitz & Esposito (2014).
   m.def("transfer_entropy_causal_map", &transfer_entropy_causal_map_wrapper,
         py::arg("X"), py::arg("tau"), py::arg("m")=1, py::arg("lag")=1,
         py::arg("dt")=1.e0, py::arg("k")=5, py::arg("trial")=0, py::arg("n_threads")=1,
+        py::arg("seed")=1234,
         R"doc(Compute a transfer entropy causal map for multivariate time series.
 
 Parameters
@@ -642,6 +694,9 @@ trial : int, optional
     Number of surrogate trials. Default 0.
 n_threads : int, optional
     Number of OpenMP threads. Default 1.
+seed : int, optional
+    Seed of the surrogate shuffles; each pair uses (seed, j, i), so the result
+    does not depend on n_threads. Default 1234.
 
 Returns
 -------
@@ -663,14 +718,17 @@ value : ndarray of shape (N, N)
 Two modes depending on whether *mask* is supplied:
 
 **No mask (default)** — full or IF-only computation:
-  tau : ndarray of shape (N,), dtype int32, or scalar int
-      Time delay per variable (scalar is broadcast to all variables).
+  tau : scalar int, or ndarray of shape (N,), dtype int32, with the same
+      value for every variable (a scalar is broadcast; unequal values raise
+      ValueError).
   X may be 2D (N, Nt) or 3D (N, Nt, dim).
 
 **With mask** — compute only the requested pairs:
-  tau  : scalar int or ndarray of shape (N,), dtype int32.
+  tau  : as above.
   mask : ndarray of shape (N, N), dtype bool.
-      Compute IF only where mask[i, j] is True and i != j.
+      A pair (i, j), i != j, is computed if mask[i, j] or mask[j, i] is True;
+      both directions of that pair are then filled in (IF_map[i, j] and
+      IF_map[j, i], and Leak and dI). Pairs with neither entry set are 0.
   X must be 2D (N, Nt).
 
 Parameters common to both modes

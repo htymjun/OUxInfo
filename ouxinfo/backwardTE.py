@@ -33,6 +33,6 @@ def backward_transfer_entropy(x, y, tau=1, m=1, lag=1, dt=1.e0, k=5, trial=0):
   y_ = y.reshape(-1,1) if y.ndim == 1 else y
   xb = np.ascontiguousarray(x_[::-1,:])
   yb = np.ascontiguousarray(y_[::-1,:])
-  BTE = transfer_entropy(xb, yb, tau=tau, m=m, lag=lag, dt=dt, k=k, trial=1)
+  BTE = transfer_entropy(xb, yb, tau=tau, m=m, lag=lag, dt=dt, k=k, trial=trial)
   return BTE
 

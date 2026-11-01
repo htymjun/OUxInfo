@@ -43,7 +43,7 @@ def _kl(x, y, k):
   n, d = x.shape
   rho = np.partition(_cheb(x, x), k, axis=1)[:, k]
   nu = np.partition(_cheb(x, y), k - 1, axis=1)[:, k - 1]
-  return max(d * np.mean(np.log(nu / rho)) + np.log(len(y) / (n - 1)), 0.0)
+  return d * np.mean(np.log(nu / rho)) + np.log(len(y) / (n - 1))
 
 
 def _corr_gauss(n, d, r, rng):

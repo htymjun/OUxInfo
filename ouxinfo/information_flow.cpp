@@ -10,6 +10,13 @@
 namespace py = pybind11;
 
 
+// (N, dim) sample array of a single-pair estimator: at least one column, finite values.
+inline void check_samples(const py::buffer_info& info, const char* name) {
+  check_dim(info.shape[info.ndim - 1], name);
+  check_finite(static_cast<const double*>(info.ptr), (size_t)info.size, name);
+}
+
+
 // ============================================================
 // MI with prebuilt X marginal
 //
@@ -28,15 +35,14 @@ T mi_with_prebuilt_x(
   if (N <= k) return std::numeric_limits<T>::quiet_NaN();
   int dxy = dx + dy;
 
-  std::vector<T> XY(N * dxy);
+  std::vector<T> XY((size_t)N * dxy);
   for (int i = 0; i < N; i++) {
-    for (int j = 0; j < dx; j++) XY[i*dxy+j]    = X[i*dx+j];
-    for (int j = 0; j < dy; j++) XY[i*dxy+dx+j] = Y_data[i*dy+j];
+    for (int j = 0; j < dx; j++) XY[(size_t)i*dxy+j]    = X[(size_t)i*dx+j];
+    for (int j = 0; j < dy; j++) XY[(size_t)i*dxy+dx+j] = Y_data[(size_t)i*dy+j];
   }
   PointCloud cloud_XY;
   cloud_XY.N = N; cloud_XY.dim = dxy; cloud_XY.pts = XY.data();
   my_kd_tree_t<T> index_XY(dxy, cloud_XY, KDTreeSingleIndexAdaptorParams(10));
-  index_XY.buildIndex();
 
   SortedArray1D<T> sa_Y;
   std::unique_ptr<my_kd_tree_t<T>> idx_Y;
@@ -46,7 +52,6 @@ T mi_with_prebuilt_x(
   } else {
     cloud_Y.N = N; cloud_Y.dim = dy; cloud_Y.pts = Y_data;
     idx_Y = std::make_unique<my_kd_tree_t<T>>(dy, cloud_Y, KDTreeSingleIndexAdaptorParams(10));
-    idx_Y->buildIndex();
   }
 
   T   sum_psi_nX = 0, sum_psi_nY = 0;
@@ -59,7 +64,7 @@ T mi_with_prebuilt_x(
   for (int i = 0; i < N; i++) {
     KNNResultSet<T> resultSet(k+1);
     resultSet.init(ret_index.data(), out_dist.data());
-    index_XY.findNeighbors(resultSet, &XY[i * dxy], SearchParameters(0, false));
+    index_XY.findNeighbors(resultSet, &XY[(size_t)i*dxy], SearchParameters(0, false));
     T eps = out_dist[k];
 
     int cx;
@@ -67,7 +72,7 @@ T mi_with_prebuilt_x(
       cx = sa_X->countStrict(X[i], eps, i);
     } else {
       StrictRadiusCountSet<T> rs(eps, (size_t)i);
-      idx_X->findNeighbors(rs, &X[i*dx], SearchParameters(0, false));
+      idx_X->findNeighbors(rs, &X[(size_t)i*dx], SearchParameters(0, false));
       cx = (int)rs.count;
     }
 
@@ -76,7 +81,7 @@ T mi_with_prebuilt_x(
       cy = sa_Y.countStrict(Y_data[i], eps, i);
     } else {
       StrictRadiusCountSet<T> rs(eps, (size_t)i);
-      idx_Y->findNeighbors(rs, &Y_data[i*dy], SearchParameters(0, false));
+      idx_Y->findNeighbors(rs, &Y_data[(size_t)i*dy], SearchParameters(0, false));
       cy = (int)rs.count;
     }
 
@@ -89,7 +94,7 @@ T mi_with_prebuilt_x(
     }
   }
   }
-  T I = T(0);
+  T I = std::numeric_limits<T>::quiet_NaN();  // stays NaN if every point had eps == 0
   if (valid_pts > 0)
     I = digamma(k) - sum_psi_nX/valid_pts - sum_psi_nY/valid_pts + digamma(N);
   return I;
@@ -117,7 +122,6 @@ T information_flow(T* X, T* Y, int tau, T dt, int k, int dx, int dy, int N) {
   } else {
     cloud_X.N = Neff; cloud_X.dim = dx; cloud_X.pts = X;
     idx_X = std::make_unique<my_kd_tree_t<T>>(dx, cloud_X, KDTreeSingleIndexAdaptorParams(10));
-    idx_X->buildIndex();
   }
 
   const SortedArray1D<T>*  sa_X_ptr  = (dx == 1)  ? &sa_X         : nullptr;
@@ -163,7 +167,6 @@ struct CountSpace {
       cloud = std::make_unique<PointCloud>();
       cloud->N = N; cloud->dim = dim; cloud->pts = pts.data();
       tree = std::make_unique<my_kd_tree_t<T>>(dim, *cloud, KDTreeSingleIndexAdaptorParams(10));
-      tree->buildIndex();
     }
   }
 
@@ -232,7 +235,7 @@ T cmi_with_prebuilt(const CountSpace<T>& sZ, const CountSpace<T>& sXZ,
     }
   }
   }
-  T I = T(0);
+  T I = std::numeric_limits<T>::quiet_NaN();  // stays NaN if every point had eps == 0
   if (valid_pts > 0)
     I = digamma(k) + sum_psi_nZ/valid_pts - sum_psi_nXZ/valid_pts - sum_psi_nYZ/valid_pts;
   return I;
@@ -308,7 +311,7 @@ py::object information_flow_causal_map_wrapper(
   for (int v = 0; v < N; ++v)
     IF[v*N+v] = dI[v*N+v] = Leak[v*N+v] = std::numeric_limits<double>::quiet_NaN();
 
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
 
   if (dx == 1) {
     // Precompute per-variable sorted arrays (read-only during parallel loop, thread-safe).
@@ -319,8 +322,8 @@ py::object information_flow_causal_map_wrapper(
     std::vector<SortedArray1D<double>> sa_vars(N), sa_lag_vars(N);
     if (Neff > 0) {
       for (int v = 0; v < N; ++v) {
-        sa_vars[v].build(X + v * Nt, Neff);
-        sa_lag_vars[v].build(X + v * Nt + tau, Neff);
+        sa_vars[v].build(X + (size_t)v * Nt, Neff);
+        sa_lag_vars[v].build(X + (size_t)v * Nt + tau, Neff);
       }
     }
     my_kd_tree_t<double>* const no_kd = nullptr;
@@ -329,8 +332,8 @@ py::object information_flow_causal_map_wrapper(
     for (py::ssize_t p = 0; p < num_pairs; ++p) {
       int j = pairs[p].first;
       int i = pairs[p].second;
-      double* xi = X + i * Nt;
-      double* xj = X + j * Nt;
+      double* xi = X + (size_t)i * Nt;
+      double* xj = X + (size_t)j * Nt;
 
       if (Neff <= 0) {
         IF[j*N+i] = IF[i*N+j] = dI[j*N+i] = dI[i*N+j] =
@@ -362,8 +365,8 @@ py::object information_flow_causal_map_wrapper(
 
       int    tau_i = tau_arr[i];
       int    tau_j = tau_arr[j];
-      double *xi   = X + i * Nt * dx;
-      double *xj   = X + j * Nt * dx;
+      double *xi   = X + (size_t)i * Nt * dx;
+      double *xj   = X + (size_t)j * Nt * dx;
       int Neff_i = Nt - tau_i;
       int Neff_j = Nt - tau_j;
 
@@ -477,20 +480,20 @@ py::object information_flow_causal_map_mask_wrapper(
   std::vector<SortedArray1D<double>> sa_vars(Nx), sa_lag_vars(Nx);
   if (Neff > 0) {
     for (int v = 0; v < Nx; ++v) {
-      sa_vars[v].build(X + v * Nt, Neff);
-      sa_lag_vars[v].build(X + v * Nt + tau, Neff);
+      sa_vars[v].build(X + (size_t)v * Nt, Neff);
+      sa_lag_vars[v].build(X + (size_t)v * Nt + tau, Neff);
     }
   }
   my_kd_tree_t<double>* const no_kd = nullptr;
 
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
   const py::ssize_t num_pairs = static_cast<py::ssize_t>(pairs.size());
   #pragma omp parallel for schedule(dynamic)
   for (py::ssize_t p = 0; p < num_pairs; ++p) {
     int a = pairs[p].first;
     int b = pairs[p].second;
-    double* xa = X + a * Nt;
-    double* xb = X + b * Nt;
+    double* xa = X + (size_t)a * Nt;
+    double* xb = X + (size_t)b * Nt;
 
     if (Neff <= 0) {
       IF[a*Nx+b] = IF[b*Nx+a] = dI[a*Nx+b] = dI[b*Nx+a] =
@@ -559,7 +562,7 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
   for (int v = 0; v < N; ++v)
     IF[v*N+v] = std::numeric_limits<double>::quiet_NaN();
 
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
   #pragma omp parallel for schedule(dynamic)
   for (py::ssize_t p = 0; p < num_pairs; ++p) {
     int j = pairs[p].first;
@@ -567,8 +570,8 @@ py::array_t<double> information_flow_only_causal_map_wrapper(
 
     int    tau_i = tau_arr[i];
     int    tau_j = tau_arr[j];
-    double *xi   = X + i * Nt * dx;
-    double *xj   = X + j * Nt * dx;
+    double *xi   = X + (size_t)i * Nt * dx;
+    double *xj   = X + (size_t)j * Nt * dx;
     int Neff_i = Nt - tau_i;
     int Neff_j = Nt - tau_j;
 
@@ -659,11 +662,11 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
   std::vector<SortedArray1D<double>> sa_vars(Nx);
   for (int v = 0; v < Nx; ++v) {
     int neff = Nt - tau_arr[v];
-    if (neff > 0) sa_vars[v].build(X + v * Nt, neff);
+    if (neff > 0) sa_vars[v].build(X + (size_t)v * Nt, neff);
   }
   my_kd_tree_t<double>* const no_kd = nullptr;  // dx==1: kd-tree path never used
 
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
   const py::ssize_t num_pairs = static_cast<py::ssize_t>(pairs.size());
   #pragma omp parallel for schedule(dynamic)
   for (py::ssize_t p = 0; p < num_pairs; ++p) {
@@ -671,8 +674,8 @@ py::array_t<double> information_flow_only_causal_map_mask_wrapper(
     int b = pairs[p].second;
 
     int     tau  = tau_arr[a];   // tau_a == tau_b always
-    double* xa   = X + a * Nt;
-    double* xb   = X + b * Nt;
+    double* xa   = X + (size_t)a * Nt;
+    double* xb   = X + (size_t)b * Nt;
     int     Neff = Nt - tau;
 
     if (Neff <= 0) {
@@ -726,9 +729,9 @@ py::object information_flow_causal_map_cond_wrapper(
   if (info_Z.shape[0] != Nt)
     throw std::runtime_error("Z must have Nt rows (one per time step of X)");
   int dz = (info_Z.ndim == 2) ? static_cast<int>(info_Z.shape[1]) : 1;
-  if (dz < 1)
-    throw std::runtime_error("Z must have at least one column");
+  check_dim(dz, "Z");
   const double* Z = static_cast<const double*>(info_Z.ptr);
+  check_finite(Z, (size_t)info_Z.size, "Z");
 
   bool has_mask = !mask_obj.is_none();
   py::array_t<bool, py::array::c_style> mask_arr;
@@ -779,7 +782,7 @@ py::object information_flow_causal_map_cond_wrapper(
     return IF_map;
   }
 
-  omp_set_num_threads(n_threads);
+  OmpThreadGuard omp_guard(n_threads);
 
   // sA[v] = (x_v,t, Z_t), sB[v] = (x_v,t+tau, Z_t), t = 0..Neff-1
   CountSpace<double> sZ;
@@ -835,6 +838,15 @@ py::object information_flow_causal_map_dispatcher(
     py::object Z_obj)
 {
   check_knn_k(k);
+  {
+    py::buffer_info info = X_obj.request();
+    if (info.ndim != 2 && info.ndim != 3)
+      throw std::runtime_error("X must be 2D (N, Nt) or 3D (N, Nt, dx)");
+    if (info.shape[0] < 1)
+      throw std::invalid_argument("X must contain at least one variable");
+    if (info.ndim == 3) check_dim(info.shape[2], "X");
+    check_finite(static_cast<const double*>(info.ptr), (size_t)info.size, "X");
+  }
 
   // Broadcast scalar tau to a per-variable array
   py::array_t<int, py::array::c_style> tau_arr;
@@ -852,6 +864,8 @@ py::object information_flow_causal_map_dispatcher(
   // per-variable delays instead of silently returning path-dependent results.
   {
     auto t = tau_arr.unchecked<1>();
+    if (t.shape(0) != X_obj.request().shape[0])
+      throw std::runtime_error("tau length must equal N");
     for (py::ssize_t i = 1; i < t.shape(0); ++i)
       if (t(i) != t(0))
         throw std::invalid_argument("information_flow_causal_map requires the same tau for all variables");

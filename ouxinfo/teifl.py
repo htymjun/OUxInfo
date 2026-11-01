@@ -47,7 +47,7 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
   # sTE > mTE > IF
   # error check
   if max_m < 2 and multi is True:
-    raise InvalidInputError("m must be greater than 2")
+    raise ValueError("max_m must be at least 2")
   if X.ndim not in [2, 3]:
     raise ValueError("Input array X must be 2D (N,Nt) or 3D (N,Nt,dim)")
   N = X.shape[0]
@@ -81,13 +81,13 @@ def TEIFL(X, tau=1, dt=1.e0, lag=1, max_m=10, tol=0.01e0, k=5, n_threads=1, resu
           prev_tmp = sTE[j,i]
           for m in range(2, max_m+1):
             tmp = transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
-            mTE[j,i] = tmp
+            mTE[j,i]  = tmp
+            mmap[j,i] = m   # the embedding used for mTE[j,i] and bTE[j,i]
             if prev_tmp > 1e-10:
               decrease_rate = (prev_tmp - tmp) / prev_tmp
               if decrease_rate <= tol:
                 break
             prev_tmp  = tmp
-            mmap[j,i] = m
           # backward multi-time step transfer entropy
           bTE[j,i] = backward_transfer_entropy(xi_, xj_, tau=tau, m=m, lag=lag, dt=dt, k=k)
     t_end = time.time()

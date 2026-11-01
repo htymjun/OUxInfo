@@ -91,6 +91,7 @@ struct Chebyshev_Adaptor {
 // of the offsets; the sum over-estimates it, so cells that contain true neighbours are
 // pruned and kNN radii come out too large (~9% of points in 2D, more in higher dims).
 // This class hides findNeighbors() with a search that uses max() instead.
+// The (inherited) constructor builds the index; calling buildIndex() again would build it twice.
 template <class T, class DataSource, typename IndexType = size_t>
 class ChebyshevKDTree
   : public nanoflann::KDTreeSingleIndexAdaptor<Chebyshev_Adaptor<T, DataSource>, DataSource, -1, IndexType>

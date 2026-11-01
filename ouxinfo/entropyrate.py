@@ -21,6 +21,8 @@ def entropy_rate(x, tau=1, dt=1.e0, k=5):
   float
       Entropy rate.
   """
+  if tau < 1:
+    raise ValueError("tau must be >= 1")
   if x.ndim == 1:
     x = x.reshape(-1,1)
   if x.ndim == 2:

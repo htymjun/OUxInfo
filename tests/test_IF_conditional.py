@@ -228,7 +228,7 @@ def test_conditional_input_validation():
     information_flow(x, y, Z=rng.standard_normal((199, 1)))   # wrong length
   with pytest.raises(RuntimeError):
     information_flow(x, y, Z=rng.standard_normal(200))        # must be 2D like X and Y
-  with pytest.raises(RuntimeError):
+  with pytest.raises(ValueError):
     information_flow(x, y, Z=np.zeros((200, 0)))
   with pytest.raises(ValueError):
     information_flow(x, y, tau=-1)
